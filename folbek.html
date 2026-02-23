@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MIUI Theme Fallback Tool v2.0</title>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --surface2: #1a1a24;
+    --border: #2a2a3a;
+    --accent: #7c6aff;
+    --accent2: #ff6a9b;
+    --accent3: #6affb8;
+    --text: #e8e8f0;
+    --text-dim: #6a6a88;
+    --error: #ff4d6a;
+    --warn: #ffb347;
+    --ok: #4dffb0;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: monospace;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  .container { max-width: 1400px; margin: 0 auto; padding: 32px 24px; }
+
+  header { margin-bottom: 40px; border-bottom: 1px solid var(--border); padding-bottom: 24px; }
+  h1 { font-size: 28px; margin-bottom: 8px; }
+  .subtitle { font-size: 11px; color: var(--text-dim); }
+
+  .tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+  }
+
+  .tab {
+    padding: 10px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 12px;
+  }
+
+  .tab.active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+  }
+
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 900px) { .grid2 { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+
+  .card h3 {
+    font-size: 13px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  textarea {
+    width: 100%;
+    height: 250px;
+    padding: 12px;
+    background: #080810;
+    color: #c8c8e8;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-family: monospace;
+    font-size: 12px;
+    margin-bottom: 12px;
+    outline: none;
+  }
+
+  textarea:focus { border-color: var(--accent); }
+
+  .btn {
+    padding: 8px 16px;
+    margin-right: 8px;
+    margin-bottom: 8px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-primary:hover { background: #9580ff; }
+
+  .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn-secondary:hover { border-color: var(--accent); }
+
+  .btn-success { background: var(--accent3); color: #000; font-weight: 700; }
+  .btn-danger { background: transparent; color: var(--error); border: 1px solid var(--error); }
+
+  .issue {
+    padding: 12px;
+    margin: 8px 0;
+    border-radius: 8px;
+    border-left: 3px solid;
+    font-size: 12px;
+  }
+
+  .issue.error { background: rgba(255,77,106,0.1); border-left-color: var(--error); }
+  .issue.warn { background: rgba(255,179,71,0.1); border-left-color: var(--warn); }
+  .issue.ok { background: rgba(77,255,176,0.1); border-left-color: var(--ok); }
+
+  .form-input {
+    width: 100%;
+    padding: 8px 12px;
+    margin-bottom: 12px;
+    background: #080810;
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-family: monospace;
+    font-size: 12px;
+    outline: none;
+  }
+
+  .form-input:focus { border-color: var(--accent); }
+
+  .checkbox-row {
+    display: flex;
+    gap: 10px;
+    padding: 10px;
+    background: var(--surface2);
+    border-radius: 6px;
+    margin-bottom: 8px;
+    font-size: 12px;
+  }
+
+  .checkbox-row input { cursor: pointer; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+    margin-top: 12px;
+  }
+
+  table th {
+    text-align: left;
+    padding: 8px;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+    font-size: 10px;
+    text-transform: uppercase;
+  }
+
+  table td {
+    padding: 8px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+
+  table tr:hover td { background: rgba(124,106,255,0.05); }
+
+  .pill {
+    display: inline-block;
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 12px;
+    background: rgba(124,106,255,0.15);
+    color: var(--accent3);
+    border: 1px solid rgba(124,106,255,0.3);
+  }
+
+  #toast {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: var(--surface2);
+    color: var(--accent3);
+    padding: 12px 20px;
+    border-radius: 8px;
+    border: 1px solid var(--accent3);
+    font-size: 12px;
+    z-index: 9999;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: all 0.3s;
+    pointer-events: none;
+  }
+
+  #toast.show { opacity: 1; transform: translateY(0); }
+
+  .empty-state { text-align: center; padding: 30px; color: var(--text-dim); }
+</style>
+</head>
+<body>
+
+<div id="toast"></div>
+
+<div class="container">
+  <header>
+    <h1>🎨 MIUI Theme Fallback v2.0</h1>
+    <p class="subtitle">Analyzer • Auto Fix • Typo Fix • Rename • Diff • Builder • Reference</p>
+  </header>
+
+  <div class="tabs" id="tabButtons"></div>
+
+  <div id="tabContainer"></div>
+
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// TYPO DETECTOR
+// ═══════════════════════════════════════════════════════
+
+const TypoFinder = {
+  typos: {
+    'drewable': { fix: 'drawable', severity: 'critical' },
+    'drawble': { fix: 'drawable', severity: 'critical' },
+    'ist_item': { fix: 'list_item', severity: 'critical' },
+    'embeded': { fix: 'embedded', severity: 'high' },
+    'appcomat': { fix: 'appcompat', severity: 'high' },
+    'prefrence': { fix: 'preference', severity: 'high' },
+  },
+
+  detect(text) {
+    const found = [];
+    const regex = /<drawable\s+name="([^"]+)"/g;
+    let match;
+    while ((match = regex.exec(text)) !== null) {
+      const name = match[1];
+      for (const [typo, data] of Object.entries(this.typos)) {
+        if (name.includes(typo)) {
+          found.push({ typo, fix: data.fix, severity: data.severity, name });
+        }
+      }
+    }
+    return found;
+  },
+
+  fixAll(text) {
+    let result = text;
+    for (const [typo, data] of Object.entries(this.typos)) {
+      const regex = new RegExp(`(name=")([^"]*${typo}[^"]*)("`, 'gi');
+      result = result.replace(regex, (m, p1, p2, p3) => {
+        return p1 + p2.replace(new RegExp(typo, 'gi'), data.fix) + p3;
+      });
+    }
+    return result;
+  }
+};
+
+// ═══════════════════════════════════════════════════════
+// XML PARSER
+// ═══════════════════════════════════════════════════════
+
+function parseXML(xml) {
+  const entries = [];
+  const regex = /<drawable\s+([^>]+)>([^<]*)<\/drawable>/gs;
+  let match;
+  while ((match = regex.exec(xml)) !== null) {
+    const attrs = match[1];
+    const content = match[2].trim();
+    const nameMatch = attrs.match(/name="([^"]+)"/);
+    const pkgMatch = attrs.match(/package="([^"]+)"/);
+    if (nameMatch) {
+      entries.push({
+        name: nameMatch[1],
+        package: pkgMatch ? pkgMatch[1] : '',
+        target: content
+      });
+    }
+  }
+  return entries;
+}
+
+// ═══════════════════════════════════════════════════════
+// UI
+// ═══════════════════════════════════════════════════════
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+function copyText(text) {
+  navigator.clipboard.writeText(text);
+  toast('✅ Copied!');
+}
+
+function downloadText(text, filename) {
+  const blob = new Blob([text], { type: 'application/xml' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  toast(`✅ ${filename} downloaded`);
+}
+
+// ═══════════════════════════════════════════════════════
+// TABS DEFINITION
+// ═══════════════════════════════════════════════════════
+
+const tabs = {
+  analyzer: {
+    name: '🔍 Analyzer',
+    html: `
+      <div class="grid2">
+        <div>
+          <div class="card">
+            <h3>Input XML</h3>
+            <textarea id="analyzerInput" placeholder="Paste fallback.xml..."></textarea>
+            <button class="btn btn-primary" onclick="runAnalyzer()">▶ Analyze</button>
+            <button class="btn btn-secondary" onclick="loadSample()">Load Sample</button>
+            <button class="btn btn-secondary" onclick="document.getElementById('analyzerInput').value=''">Clear</button>
+          </div>
+        </div>
+        <div>
+          <div id="analyzerStats" style="display:none">
+            <div class="card">
+              <h3>📊 Statistics</h3>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                <div><span style="color:var(--ok);font-size:20px;font-weight:700" id="st-total">0</span><br><small style="color:var(--text-dim)">TOTAL</small></div>
+                <div><span style="color:var(--accent3);font-size:20px;font-weight:700" id="st-unique">0</span><br><small style="color:var(--text-dim)">UNIQUE</small></div>
+                <div><span style="color:var(--error);font-size:20px;font-weight:700" id="st-dup">0</span><br><small style="color:var(--text-dim)">DUP</small></div>
+                <div><span style="color:var(--warn);font-size:20px;font-weight:700" id="st-typo">0</span><br><small style="color:var(--text-dim)">TYPO</small></div>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <h3>🔴 Issues</h3>
+            <div id="analyzerIssues"><div class="empty-state">Run analyzer</div></div>
+          </div>
+          <div class="card">
+            <h3>📋 Entries</h3>
+            <div id="analyzerTable" style="max-height:400px;overflow-y:auto"><div class="empty-state">No data</div></div>
+          </div>
+        </div>
+      </div>
+    `
+  },
+
+  autofix: {
+    name: '🔧 Auto Fix',
+    html: `
+      <div class="grid2">
+        <div>
+          <div class="card">
+            <h3>Input XML</h3>
+            <textarea id="autofixInput" placeholder="Paste XML..."></textarea>
+            <button class="btn btn-primary" onclick="runAutoFix()">⚡ Auto Fix</button>
+            <button class="btn btn-secondary" onclick="document.getElementById('autofixInput').value=''">Clear</button>
+          </div>
+          <div class="card">
+            <h3>Options</h3>
+            <div class="checkbox-row"><input type="checkbox" id="fixStandalone" checked> <label>Remove standalone</label></div>
+            <div class="checkbox-row"><input type="checkbox" id="fixEncoding" checked> <label>UTF8 → utf-8</label></div>
+            <div class="checkbox-row"><input type="checkbox" id="fixDup" checked> <label>Remove duplicates</label></div>
+            <div class="checkbox-row"><input type="checkbox" id="fixEmpty" checked> <label>Clean blank lines</label></div>
+          </div>
+        </div>
+        <div>
+          <div class="card">
+            <h3>Output</h3>
+            <textarea id="autofixOutput" readonly placeholder="Output..."></textarea>
+            <button class="btn btn-secondary" onclick="copyText(document.getElementById('autofixOutput').value)">📋 Copy</button>
+            <button class="btn btn-success" onclick="downloadText(document.getElementById('autofixOutput').value,'fallback_fixed.xml')">⬇️ Download</button>
+          </div>
+          <div class="card">
+            <h3>Log</h3>
+            <div id="fixLog" style="max-height:300px;overflow-y:auto"><div class="empty-state">Run fix</div></div>
+          </div>
+        </div>
+      </div>
+    `
+  },
+
+  typofix: {
+    name: '✏️ Typo Fix',
+    html: `
+      <div class="grid2">
+        <div>
+          <div class="card">
+            <h3>Typo Detection</h3>
+            <p style="font-size:11px;color:var(--text-dim);margin-bottom:12px">Deteksi: drewable, ist_item, embeded, dll</p>
+            <textarea id="typoInput" placeholder="Paste XML..."></textarea>
+            <button class="btn btn-primary" onclick="runTypoDetection()">🔍 Detect</button>
+            <button class="btn btn-secondary" onclick="document.getElementById('typoInput').value=''">Clear</button>
+          </div>
+        </div>
+        <div>
+          <div class="card">
+            <h3>Found</h3>
+            <div id="typoList" style="max-height:500px;overflow-y:auto"><div class="empty-state">Run detection</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Fixed Output</h3>
+        <textarea id="typoOutput" readonly placeholder="Output..."></textarea>
+        <button class="btn btn-secondary" onclick="copyText(document.getElementById('typoOutput').value)">📋 Copy</button>
+        <button class="btn btn-success" onclick="downloadText(document.getElementById('typoOutput').value,'fallback_typo_fixed.xml')">⬇️ Download</button>
+      </div>
+    `
+  },
+
+  rename: {
+    name: '🔄 Rename',
+    html: `
+      <div class="grid2">
+        <div>
+          <div class="card">
+            <h3>Bulk Rename PNG</h3>
+            <p style="font-size:11px;color:var(--text-dim);margin-bottom:12px">Replace target filename in all entries</p>
+            <label style="display:block;font-size:11px;color:var(--text-dim);margin-bottom:4px">Old filename</label>
+            <input class="form-input" id="renameOld" placeholder="e.g. preference_item_bg_dark.9.png">
+            <label style="display:block;font-size:11px;color:var(--text-dim);margin-bottom:4px">New filename</label>
+            <input class="form-input" id="renameNew" placeholder="e.g. my_bg.9.png">
+            <label style="display:block;font-size:11px;color:var(--text-dim);margin-bottom:4px">Input XML</label>
+            <textarea id="renameInput" placeholder="Paste XML..." style="height:200px"></textarea>
+            <button class="btn btn-primary" onclick="runRename()">🔄 Rename</button>
+            <button class="btn btn-secondary" onclick="clearRenameTab()">Clear</button>
+          </div>
+        </div>
+        <div>
+          <div class="card">
+            <h3>Output</h3>
+            <div id="renameCount" style="font-size:12px;color:var(--accent3);margin-bottom:12px"></div>
+            <textarea id="renameOutput" readonly placeholder="Output..."></textarea>
+            <button class="btn btn-secondary" onclick="copyText(document.getElementById('renameOutput').value)">📋 Copy</button>
+            <button class="btn btn-success" onclick="downloadText(document.getElementById('renameOutput').value,'fallback_renamed.xml')">⬇️ Download</button>
+          </div>
+        </div>
+      </div>
+    `
+  },
+
+  diff: {
+    name: '🔀 Diff',
+    html: `
+      <div class="grid2">
+        <div>
+          <div class="card">
+            <h3>Original</h3>
+            <textarea id="diffOriginal" placeholder="Original XML..."></textarea>
+          </div>
+        </div>
+        <div>
+          <div class="card">
+            <h3>Modified</h3>
+            <textarea id="diffModified" placeholder="Modified XML..."></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Diff View</h3>
+        <button class="btn btn-primary" onclick="generateDiff()">🔀 Generate</button>
+        <div id="diffOutput" style="max-height:600px;overflow-y:auto;margin-top:12px"><div class="empty-state">Fill both fields</div></div>
+      </div>
+    `
+  },
+
+  builder: {
+    name: '🧱 Builder',
+    html: `
+      <div class="grid2">
+        <div>
+          <div class="card">
+            <h3>Create Entry</h3>
+            <label style="display:block;font-size:11px;color:var(--text-dim);margin-bottom:4px">Name</label>
+            <input class="form-input" id="builderName" placeholder="drawable name" oninput="updateBuilderPreview()">
+            <label style="display:block;font-size:11px;color:var(--text-dim);margin-bottom:4px">Target</label>
+            <input class="form-input" id="builderTarget" placeholder="file.9.png" oninput="updateBuilderPreview()">
+            <label style="display:block;font-size:11px;color:var(--text-dim);margin-bottom:4px">Package</label>
+            <input class="form-input" id="builderPackage" placeholder="miui (optional)">
+            <div style="background:var(--surface2);padding:10px;border-radius:8px;margin-bottom:12px;font-size:11px">
+              <textarea id="builderPreview" readonly style="height:60px;font-size:11px"></textarea>
+            </div>
+            <button class="btn btn-primary" onclick="addBuilderEntry()">➕ Add</button>
+            <button class="btn btn-secondary" onclick="clearBuilderForm()">Reset</button>
+          </div>
+        </div>
+        <div>
+          <div class="card">
+            <h3>Entries</h3>
+            <div id="builderList" style="max-height:400px;overflow-y:auto"><div class="empty-state">No entries</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Generated XML</h3>
+        <textarea id="builderOutput" readonly style="height:300px" placeholder="XML..."></textarea>
+        <button class="btn btn-secondary" onclick="copyText(document.getElementById('builderOutput').value)">📋 Copy</button>
+        <button class="btn btn-success" onclick="downloadText(document.getElementById('builderOutput').value,'fallback.xml')">⬇️ Download</button>
+        <button class="btn btn-danger" onclick="clearBuilderList()">🗑️ Clear</button>
+      </div>
+    `
+  }
+};
+
+// ═══════════════════════════════════════════════════════
+// INIT & FUNCTIONS
+// ═══════════════════════════════════════════════════════
+
+let currentTab = 'analyzer';
+let builderEntries = [];
+
+function switchTab(name) {
+  currentTab = name;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelector(`[data-tab="${name}"]`).classList.add('active');
+  document.getElementById(`panel-${name}`).classList.add('active');
+}
+
+function initTabs() {
+  const container = document.getElementById('tabContainer');
+  const buttons = document.getElementById('tabButtons');
+
+  for (const [key, tab] of Object.entries(tabs)) {
+    const btn = document.createElement('button');
+    btn.className = `tab ${key === 'analyzer' ? 'active' : ''}`;
+    btn.textContent = tab.name;
+    btn.setAttribute('data-tab', key);
+    btn.onclick = () => switchTab(key);
+    buttons.appendChild(btn);
+
+    const panel = document.createElement('div');
+    panel.className = `panel ${key === 'analyzer' ? 'active' : ''}`;
+    panel.id = `panel-${key}`;
+    panel.innerHTML = tab.html;
+    container.appendChild(panel);
+  }
+}
+
+function loadSample() {
+  document.getElementById('analyzerInput').value = `<?xml version='1.0' encoding='utf-8' standalone='yes' ?>
+<MIUI_Theme_Values>
+  <drawable name="drewable_bg.9.png" package="miui">window_bg.9.png</drawable>
+  <drawable name="ist_item_bg.9.png">preference_item_bg.9.png</drawable>
+  <drawable name="ist_item_bg.9.png">preference_item_bg.9.png</drawable>
+</MIUI_Theme_Values>`;
+  toast('Sample loaded');
+}
+
+function runAnalyzer() {
+  const xml = document.getElementById('analyzerInput').value;
+  if (!xml) { toast('⚠️ Paste XML'); return; }
+
+  const entries = parseXML(xml);
+  const typos = TypoFinder.detect(xml);
+  const nameCount = {};
+  entries.forEach(e => { nameCount[e.name] = (nameCount[e.name] || 0) + 1; });
+  const dups = Object.values(nameCount).filter(c => c > 1).length;
+
+  document.getElementById('st-total').textContent = entries.length;
+  document.getElementById('st-unique').textContent = Object.keys(nameCount).length;
+  document.getElementById('st-dup').textContent = dups;
+  document.getElementById('st-typo').textContent = typos.length;
+  document.getElementById('analyzerStats').style.display = 'block';
+
+  let issues = '<div class="issue ok">✅ Analysis complete</div>';
+  if (xml.includes('standalone')) issues = '<div class="issue error">🔴 Remove standalone</div>' + issues;
+  if (dups > 0) issues = `<div class="issue error">🔴 ${dups} duplicates found</div>` + issues;
+  if (typos.length > 0) issues = `<div class="issue warn">✏️ ${typos.length} typos found</div>` + issues;
+
+  document.getElementById('analyzerIssues').innerHTML = issues;
+
+  const table = `<table><thead><tr><th>#</th><th>Name</th><th>Target</th><th>Status</th></tr></thead><tbody>
+    ${entries.map((e, i) => `<tr>
+      <td>${i+1}</td>
+      <td><code style="color:var(--accent3)">${e.name}</code></td>
+      <td>${e.target}</td>
+      <td>${nameCount[e.name] > 1 ? '<span class="pill">DUP</span>' : 'OK'}</td>
+    </tr>`).join('')}
+  </tbody></table>`;
+  document.getElementById('analyzerTable').innerHTML = table;
+
+  toast('✅ Analysis done');
+}
+
+function runAutoFix() {
+  let xml = document.getElementById('autofixInput').value;
+  if (!xml) { toast('⚠️ Paste XML'); return; }
+
+  let logs = '';
+  let count = 0;
+
+  if (document.getElementById('fixStandalone').checked && xml.includes('standalone')) {
+    xml = xml.replace(/\s+standalone=['"][^'"]*['"]/g, '');
+    logs += '<div class="issue ok">✅ Removed standalone</div>';
+    count++;
+  }
+
+  if (document.getElementById('fixEncoding').checked && xml.includes('UTF8')) {
+    xml = xml.replace(/UTF8/g, 'utf-8');
+    logs += '<div class="issue ok">✅ Fixed encoding</div>';
+    count++;
+  }
+
+  if (document.getElementById('fixDup').checked) {
+    const seen = new Set();
+    const lines = xml.split('\n');
+    const cleaned = lines.filter(l => {
+      const m = l.match(/name="([^"]+)"/);
+      if (!m) return true;
+      if (seen.has(m[1])) return false;
+      seen.add(m[1]);
+      return true;
+    });
+    if (cleaned.length < lines.length) {
+      xml = cleaned.join('\n');
+      logs += '<div class="issue ok">✅ Removed duplicates</div>';
+      count++;
+    }
+  }
+
+  if (document.getElementById('fixEmpty').checked) {
+    const before = xml;
+    xml = xml.replace(/\n{3,}/g, '\n\n');
+    if (xml !== before) {
+      logs += '<div class="issue ok">✅ Cleaned blank lines</div>';
+      count++;
+    }
+  }
+
+  document.getElementById('autofixOutput').value = xml;
+  document.getElementById('fixLog').innerHTML = logs || '<div class="empty-state">No fixes</div>';
+  toast(`✅ ${count} fixes applied`);
+}
+
+function runTypoDetection() {
+  const xml = document.getElementById('typoInput').value;
+  if (!xml) { toast('⚠️ Paste XML'); return; }
+
+  const typos = TypoFinder.detect(xml);
+  if (typos.length === 0) {
+    document.getElementById('typoList').innerHTML = '<div class="empty-state">No typos found</div>';
+    return;
+  }
+
+  const unique = [...new Set(typos.map(t => t.typo))];
+  const html = unique.map(t => {
+    const data = typos.find(x => x.typo === t);
+    return `<div class="issue warn">✏️ <code>${t}</code> → <code>${data.fix}</code> (${data.severity})</div>`;
+  }).join('');
+
+  document.getElementById('typoList').innerHTML = html + '<button class="btn btn-primary" style="width:100%;margin-top:12px" onclick="applyTypoFix()">✅ Fix All</button>';
+  toast(`Found ${typos.length} typos`);
+}
+
+function applyTypoFix() {
+  const xml = document.getElementById('typoInput').value;
+  const fixed = TypoFinder.fixAll(xml);
+  document.getElementById('typoOutput').value = fixed;
+  toast('✅ Fixed!');
+}
+
+function runRename() {
+  const xml = document.getElementById('renameInput').value;
+  const old = document.getElementById('renameOld').value;
+  const neu = document.getElementById('renameNew').value;
+  if (!xml || !old || !neu) { toast('⚠️ Fill all'); return; }
+
+  const escaped = old.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const regex = new RegExp(`(>\\s*)${escaped}(\\s*<)`, 'g');
+  const count = (xml.match(regex) || []).length;
+
+  if (count === 0) {
+    document.getElementById('renameCount').textContent = `⚠️ Not found`;
+    return;
+  }
+
+  const result = xml.replace(regex, `$1${neu}$2`);
+  document.getElementById('renameOutput').value = result;
+  document.getElementById('renameCount').textContent = `✅ ${count} renamed`;
+  toast(`✅ ${count} entries renamed`);
+}
+
+function clearRenameTab() {
+  document.getElementById('renameInput').value = '';
+  document.getElementById('renameOld').value = '';
+  document.getElementById('renameNew').value = '';
+  document.getElementById('renameOutput').value = '';
+  document.getElementById('renameCount').textContent = '';
+}
+
+function generateDiff() {
+  const orig = document.getElementById('diffOriginal').value;
+  const mod = document.getElementById('diffModified').value;
+  if (!orig || !mod) { toast('⚠️ Fill both'); return; }
+
+  const origLines = orig.split('\n');
+  const modLines = mod.split('\n');
+  let html = '';
+
+  for (let i = 0; i < Math.max(origLines.length, modLines.length); i++) {
+    const o = origLines[i] || '';
+    const m = modLines[i] || '';
+
+    if (o === m) {
+      html += `<div style="padding:4px;color:var(--text-dim)">${o}</div>`;
+    } else {
+      if (o) html += `<div style="padding:4px;background:rgba(255,77,106,0.15);color:var(--error)">- ${o}</div>`;
+      if (m) html += `<div style="padding:4px;background:rgba(77,255,176,0.15);color:var(--ok)">+ ${m}</div>`;
+    }
+  }
+
+  document.getElementById('diffOutput').innerHTML = html;
+  toast('✅ Diff generated');
+}
+
+function updateBuilderPreview() {
+  const name = document.getElementById('builderName').value;
+  const target = document.getElementById('builderTarget').value;
+  const pkg = document.getElementById('builderPackage').value;
+
+  if (!name) { document.getElementById('builderPreview').value = ''; return; }
+
+  const pkgAttr = pkg ? ` package="${pkg}"` : '';
+  document.getElementById('builderPreview').value = `<drawable name="${name}"${pkgAttr}>${target}</drawable>`;
+}
+
+function addBuilderEntry() {
+  const name = document.getElementById('builderName').value.trim();
+  const target = document.getElementById('builderTarget').value.trim();
+  const pkg = document.getElementById('builderPackage').value.trim();
+
+  if (!name || !target) { toast('⚠️ Fill name and target'); return; }
+
+  builderEntries.push({ name, target, pkg });
+  updateBuilderList();
+  clearBuilderForm();
+  toast('✅ Added');
+}
+
+function clearBuilderForm() {
+  document.getElementById('builderName').value = '';
+  document.getElementById('builderTarget').value = '';
+  document.getElementById('builderPackage').value = '';
+  document.getElementById('builderPreview').value = '';
+}
+
+function clearBuilderList() {
+  builderEntries = [];
+  updateBuilderList();
+}
+
+function removeBuilderItem(idx) {
+  builderEntries.splice(idx, 1);
+  updateBuilderList();
+}
+
+function updateBuilderList() {
+  const list = document.getElementById('builderList');
+  if (builderEntries.length === 0) {
+    list.innerHTML = '<div class="empty-state">No entries</div>';
+    document.getElementById('builderOutput').value = '';
+    return;
+  }
+
+  list.innerHTML = builderEntries.map((e, i) => `<div style="padding:8px;background:var(--surface2);border-radius:8px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">
+    <div style="font-size:11px"><code>${e.name}</code> ${e.pkg ? `<span style="background:rgba(124,106,255,0.15);padding:2px 6px;border-radius:4px">${e.pkg}</span>` : ''} → ${e.target}</div>
+    <button class="btn btn-danger" onclick="removeBuilderItem(${i})">✕</button>
+  </div>`).join('');
+
+  const xml = `<?xml version='1.0' encoding='utf-8' ?>
+<MIUI_Theme_Values>
+
+${builderEntries.map(e => {
+    const pkgAttr = e.pkg ? ` package="${e.pkg}"` : '';
+    return `  <drawable name="${e.name}"${pkgAttr}>${e.target}</drawable>`;
+  }).join('\n')}
+
+</MIUI_Theme_Values>`;
+
+  document.getElementById('builderOutput').value = xml;
+}
+
+// START
+initTabs();
+</script>
+
+</body>
+</html>
