@@ -1,0 +1,1870 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MIUI Lockscreen Manifest Tool</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Syne:wght@400;600;800&display=swap');
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --surface2: #1a1a24;
+    --border: #2a2a3a;
+    --accent: #7c6aff;
+    --accent2: #ff6a9b;
+    --accent3: #6affb8;
+    --text: #e8e8f0;
+    --text-dim: #6a6a88;
+    --error: #ff4d6a;
+    --warn: #ffb347;
+    --ok: #4dffb0;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(124,106,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(124,106,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 32px 24px;
+  }
+
+  /* Header */
+  header {
+    margin-bottom: 40px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 24px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .logo {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 28px;
+    letter-spacing: -1px;
+    line-height: 1;
+  }
+  .logo span { color: var(--accent); }
+  .logo em { color: var(--accent2); font-style: normal; }
+
+  .tagline {
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-top: 6px;
+  }
+
+  .badge {
+    font-size: 10px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    letter-spacing: 1px;
+  }
+
+  /* Tabs */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 24px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 4px;
+    width: fit-content;
+  }
+
+  .tab {
+    padding: 8px 20px;
+    border-radius: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    color: var(--text-dim);
+    transition: all 0.2s;
+    letter-spacing: 0.5px;
+  }
+
+  .tab.active {
+    background: var(--accent);
+    color: white;
+  }
+
+  /* Panel layout */
+  .panel {
+    display: none;
+    animation: fadeIn 0.3s ease;
+  }
+  .panel.active { display: block; }
+
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* Grid 2 col */
+  .grid2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+  @media (max-width: 900px) { .grid2 { grid-template-columns: 1fr; } }
+
+  /* Card */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+
+  .card-header {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--surface2);
+  }
+
+  .card-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+  .dot-purple { background: var(--accent); }
+  .dot-pink { background: var(--accent2); }
+  .dot-green { background: var(--accent3); }
+  .dot-warn { background: var(--warn); }
+
+  .card-body { padding: 20px; }
+
+  /* Textarea */
+  textarea {
+    width: 100%;
+    background: #080810;
+    color: #c8c8e8;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    line-height: 1.7;
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  textarea:focus { border-color: var(--accent); }
+  textarea::placeholder { color: var(--text-dim); }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border-radius: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+    letter-spacing: 0.5px;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: white;
+  }
+  .btn-primary:hover { background: #9580ff; transform: translateY(-1px); }
+
+  .btn-secondary {
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+
+  .btn-danger {
+    background: transparent;
+    color: var(--error);
+    border: 1px solid var(--error);
+  }
+  .btn-danger:hover { background: var(--error); color: white; }
+
+  .btn-success {
+    background: var(--accent3);
+    color: #0a0a0f;
+  }
+  .btn-success:hover { opacity: 0.85; }
+
+  .btn-sm { padding: 6px 14px; font-size: 11px; }
+
+  .btn-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 14px;
+  }
+
+  /* Stats bar */
+  .stats-bar {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    padding: 14px 20px;
+    background: var(--surface2);
+    border-radius: 10px;
+    margin-bottom: 16px;
+    border: 1px solid var(--border);
+  }
+  .stat { font-size: 11px; }
+  .stat-val { font-size: 20px; font-family: 'Syne', sans-serif; font-weight: 800; display: block; }
+  .stat-val.ok { color: var(--ok); }
+  .stat-val.warn { color: var(--warn); }
+  .stat-val.error { color: var(--error); }
+  .stat-label { color: var(--text-dim); font-size: 10px; letter-spacing: 1px; text-transform: uppercase; }
+
+  /* Issues list */
+  .issue-list { display: flex; flex-direction: column; gap: 8px; }
+
+  .issue {
+    display: flex;
+    gap: 12px;
+    padding: 12px 16px;
+    border-radius: 10px;
+    border: 1px solid transparent;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .issue.error { background: rgba(255,77,106,0.08); border-color: rgba(255,77,106,0.3); }
+  .issue.warn { background: rgba(255,179,71,0.08); border-color: rgba(255,179,71,0.3); }
+  .issue.ok { background: rgba(77,255,176,0.08); border-color: rgba(77,255,176,0.3); }
+  .issue.info { background: rgba(124,106,255,0.08); border-color: rgba(124,106,255,0.3); }
+
+  .issue-icon { font-size: 16px; flex-shrink: 0; line-height: 1.4; }
+  .issue-text strong { display: block; margin-bottom: 2px; }
+  .issue-text code {
+    background: rgba(255,255,255,0.07);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+    color: var(--accent);
+  }
+
+  /* Section block for output */
+  .section-block {
+    margin-bottom: 24px;
+  }
+  .section-label {
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* Var table */
+  .var-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  .var-table th {
+    text-align: left;
+    padding: 8px 12px;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    border-bottom: 1px solid var(--border);
+  }
+  .var-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    vertical-align: top;
+  }
+  .var-table tr:hover td { background: rgba(124,106,255,0.05); }
+  .var-table code {
+    color: var(--accent3);
+    font-size: 11px;
+    background: rgba(106,255,184,0.08);
+    padding: 1px 6px;
+    border-radius: 4px;
+  }
+
+  /* Snippet builder */
+  .snippet-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 12px;
+  }
+
+  .snippet-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .snippet-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .snippet-card:active { transform: translateY(0); }
+
+  .snippet-name {
+    font-family: 'Syne', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .snippet-desc { font-size: 11px; color: var(--text-dim); line-height: 1.5; }
+  .snippet-tag {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    background: rgba(124,106,255,0.15);
+    color: var(--accent);
+    border: 1px solid rgba(124,106,255,0.3);
+    margin-top: 10px;
+    display: inline-block;
+  }
+
+  /* Form fields */
+  .form-group { margin-bottom: 16px; }
+  .form-label { font-size: 11px; color: var(--text-dim); margin-bottom: 6px; display: block; letter-spacing: 1px; text-transform: uppercase; }
+  .form-input {
+    width: 100%;
+    background: #080810;
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .form-input:focus { border-color: var(--accent); }
+  .form-row { display: flex; gap: 12px; }
+  .form-row .form-group { flex: 1; }
+
+  select.form-input { cursor: pointer; }
+
+  /* Toast */
+  #toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--surface2);
+    border: 1px solid var(--accent3);
+    color: var(--accent3);
+    padding: 12px 20px;
+    border-radius: 10px;
+    font-size: 12px;
+    z-index: 9999;
+    transform: translateY(80px);
+    opacity: 0;
+    transition: all 0.3s;
+    pointer-events: none;
+  }
+  #toast.show { transform: translateY(0); opacity: 1; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+  .empty-state {
+    text-align: center;
+    padding: 40px;
+    color: var(--text-dim);
+    font-size: 12px;
+  }
+  .empty-state .big { font-size: 40px; margin-bottom: 12px; }
+
+  hr-divider { display: block; height: 1px; background: var(--border); margin: 20px 0; }
+</style>
+</head>
+<body>
+
+<div id="toast"></div>
+
+<div class="container">
+  <header>
+    <div>
+      <div class="logo">MIUI<span>Lock</span><em>Tool</em></div>
+      <div class="tagline">Lockscreen Manifest Analyzer &amp; Builder</div>
+    </div>
+    <div class="badge">DARK TOOL v2.0</div>
+  </header>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('analyzer')">🔍 Analyzer</button>
+    <button class="tab" onclick="switchTab('autofix')">🔧 Auto Fix</button>
+    <button class="tab" onclick="switchTab('builder')">🧱 Snippet Builder</button>
+    <button class="tab" onclick="switchTab('converter')">🔄 Var Converter</button>
+    <button class="tab" onclick="switchTab('reference')">📖 Referensi</button>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       TAB 1: ANALYZER
+  ══════════════════════════════════════════════════════════ -->
+  <div id="tab-analyzer" class="panel active">
+    <div class="grid2">
+      <!-- Input -->
+      <div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title"><span class="dot dot-purple"></span> Input Manifest</div>
+            <button class="btn btn-secondary btn-sm" onclick="loadSample()">Load Sample</button>
+          </div>
+          <div class="card-body">
+            <textarea id="inputManifest" rows="22" placeholder="Paste isi manifest.xml di sini..."></textarea>
+            <div class="btn-row">
+              <button class="btn btn-primary" onclick="analyzeManifest()">▶ Analyze</button>
+              <button class="btn btn-secondary" onclick="clearAll()">Clear</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Results -->
+      <div>
+        <div id="stats-container" style="display:none">
+          <div class="stats-bar">
+            <div class="stat">
+              <span class="stat-val ok" id="st-vars">0</span>
+              <span class="stat-label">Vars</span>
+            </div>
+            <div class="stat">
+              <span class="stat-val" id="st-images">0</span>
+              <span class="stat-label">Images</span>
+            </div>
+            <div class="stat">
+              <span class="stat-val" id="st-groups">0</span>
+              <span class="stat-label">Groups</span>
+            </div>
+            <div class="stat">
+              <span class="stat-val" id="st-buttons">0</span>
+              <span class="stat-label">Buttons</span>
+            </div>
+            <div class="stat">
+              <span class="stat-val" id="st-anims">0</span>
+              <span class="stat-label">Animations</span>
+            </div>
+            <div class="stat">
+              <span class="stat-val" id="st-issues">0</span>
+              <span class="stat-label">Issues</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title"><span class="dot dot-pink"></span> Analisa & Issues</div>
+          </div>
+          <div class="card-body">
+            <div id="issue-output">
+              <div class="empty-state">
+                <div class="big">🔎</div>
+                Paste manifest lalu klik Analyze
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <br>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title"><span class="dot dot-green"></span> Var yang Terdeteksi</div>
+          </div>
+          <div class="card-body">
+            <div id="var-output">
+              <div class="empty-state" style="padding:20px">Belum ada data</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       TAB 2: SNIPPET BUILDER
+  ══════════════════════════════════════════════════════════ -->
+  <div id="tab-builder" class="panel">
+    <div class="grid2">
+      <div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title"><span class="dot dot-purple"></span> Pilih Snippet</div>
+          </div>
+          <div class="card-body">
+            <div class="snippet-grid" id="snippet-grid"></div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title"><span class="dot dot-green"></span> Konfigurasi &amp; Output</div>
+            <button class="btn btn-secondary btn-sm" onclick="copySnippet()">📋 Copy</button>
+          </div>
+          <div class="card-body">
+            <div id="snippet-config"></div>
+            <div id="snippet-preview" style="display:none; margin-top:16px;">
+              <div class="section-label"><span class="dot dot-green"></span> Generated XML</div>
+              <textarea id="snippet-output" rows="18" readonly></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       TAB 3: VAR CONVERTER
+  ══════════════════════════════════════════════════════════ -->
+  <div id="tab-converter" class="panel">
+    <div class="grid2">
+      <div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title"><span class="dot dot-warn"></span> Var Converter</div>
+          </div>
+          <div class="card-body">
+            <p style="font-size:12px;color:var(--text-dim);margin-bottom:16px;line-height:1.6">
+              Setiap tema punya nama var berbeda untuk screen height/width.<br>
+              Tool ini otomatis mengganti semua referensi var di manifest yang di-paste.
+            </p>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Nama var HEIGHT di manifest LAMA</label>
+                <input class="form-input" id="oldH" placeholder="contoh: sh" value="sh">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Nama var HEIGHT di tema BARU</label>
+                <input class="form-input" id="newH" placeholder="contoh: h" value="h">
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Nama var WIDTH di manifest LAMA</label>
+                <input class="form-input" id="oldW" placeholder="contoh: sw" value="sw">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Nama var WIDTH di tema BARU</label>
+                <input class="form-input" id="newW" placeholder="contoh: w" value="w">
+              </div>
+            </div>
+
+            <div class="form-group" style="margin-top:8px">
+              <label class="form-label">Paste blok XML yang mau diconvert</label>
+              <textarea id="conv-input" rows="14" placeholder="Paste elemen XML (Image, Group, Button) yang mengandung #sh atau #sw..."></textarea>
+            </div>
+            <div class="btn-row">
+              <button class="btn btn-primary" onclick="convertVars()">▶ Convert</button>
+              <button class="btn btn-secondary" onclick="document.getElementById('conv-input').value=''; document.getElementById('conv-output').value=''">Clear</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title"><span class="dot dot-green"></span> Hasil Convert</div>
+            <button class="btn btn-secondary btn-sm" onclick="copyConv()">📋 Copy</button>
+          </div>
+          <div class="card-body">
+            <textarea id="conv-output" rows="20" readonly placeholder="Hasil akan muncul di sini..."></textarea>
+            <div id="conv-log" style="margin-top:12px"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       TAB 2: AUTO FIX
+  ══════════════════════════════════════════════════════════ -->
+  <div id="tab-autofix" class="panel">
+    <div class="grid2">
+      <!-- Left: Upload + Options -->
+      <div>
+        <div class="card" style="margin-bottom:20px">
+          <div class="card-header">
+            <div class="card-title"><span class="dot dot-pink"></span> Upload atau Paste Manifest</div>
+          </div>
+          <div class="card-body">
+
+            <!-- Drop zone -->
+            <div id="dropzone" onclick="document.getElementById('fileInput').click()"
+              style="border:2px dashed var(--border);border-radius:12px;padding:32px;text-align:center;cursor:pointer;transition:all 0.2s;margin-bottom:16px">
+              <div style="font-size:32px;margin-bottom:8px">📂</div>
+              <div style="font-size:13px;color:var(--text-dim)">Drop manifest.xml di sini<br>atau klik untuk browse</div>
+              <div id="filename" style="margin-top:10px;font-size:11px;color:var(--accent)"></div>
+            </div>
+            <input type="file" id="fileInput" accept=".xml,.txt" style="display:none" onchange="handleFile(event)">
+
+            <div style="text-align:center;font-size:11px;color:var(--text-dim);margin:12px 0">— atau paste langsung —</div>
+
+            <textarea id="autofix-input" rows="10" placeholder="Paste isi manifest.xml di sini..."></textarea>
+
+            <div class="btn-row">
+              <button class="btn btn-primary" onclick="runAutoFix()">🔧 Auto Fix</button>
+              <button class="btn btn-secondary" onclick="clearAutoFix()">Clear</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Fix options -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title"><span class="dot dot-warn"></span> Opsi Fix</div>
+          </div>
+          <div class="card-body">
+            <div style="display:flex;flex-direction:column;gap:12px">
+
+              <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:12px">
+                <input type="checkbox" id="fix-alpha" checked style="margin-top:2px;accent-color:var(--accent)">
+                <span><strong>Fix alpha dengan var undefined</strong><br>
+                <span style="color:var(--text-dim)">Ganti <code>alpha="-#yd/540*255"</code> → <code>alpha="255"</code> jika var tidak terdefinisi</span></span>
+              </label>
+
+              <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:12px">
+                <input type="checkbox" id="fix-unlocker" checked style="margin-top:2px;accent-color:var(--accent)">
+                <span><strong>Tambah Unlocker jika tidak ada</strong><br>
+                <span style="color:var(--text-dim)">Insert Group unlocker klasik di atas <code>&lt;/Lockscreen&gt;</code></span></span>
+              </label>
+
+              <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:12px">
+                <input type="checkbox" id="fix-srcid" checked style="margin-top:2px;accent-color:var(--accent)">
+                <span><strong>Fix srcid tanpa int()</strong><br>
+                <span style="color:var(--text-dim)">Wrap expression di srcid dengan <code>int()</code> jika belum ada</span></span>
+              </label>
+
+              <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:12px">
+                <input type="checkbox" id="fix-noticedown" checked style="margin-top:2px;accent-color:var(--accent)">
+                <span><strong>Fix kondisi unlock dengan #noticeDown</strong><br>
+                <span style="color:var(--text-dim)">Hapus <code>*eq(#noticeDown,0)</code> dari kondisi unlock jika sistem notif tidak ada</span></span>
+              </label>
+
+              <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:12px">
+                <input type="checkbox" id="fix-sh" style="margin-top:2px;accent-color:var(--accent)">
+                <span>
+                  <strong>Rename var height/width</strong><br>
+                  <span style="color:var(--text-dim)">Ganti nama var secara global</span>
+                  <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+                    <input class="form-input" id="fix-old-h" placeholder="Height lama (sh)" value="sh" style="width:100px">
+                    <span style="line-height:32px;color:var(--text-dim)">→</span>
+                    <input class="form-input" id="fix-new-h" placeholder="Height baru (h)" value="h" style="width:100px">
+                    <span style="line-height:32px;color:var(--text-dim);margin-left:8px">Width:</span>
+                    <input class="form-input" id="fix-old-w" placeholder="sw" value="sw" style="width:80px">
+                    <span style="line-height:32px;color:var(--text-dim)">→</span>
+                    <input class="form-input" id="fix-new-w" placeholder="w" value="w" style="width:80px">
+                  </div>
+                </span>
+              </label>
+
+              <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:12px">
+                <input type="checkbox" id="fix-shan" checked style="margin-top:2px;accent-color:var(--accent)">
+                <span><strong>Bersihkan Command target animasi yang dihapus</strong><br>
+                <span style="color:var(--text-dim)">Hapus baris <code>&lt;Command target="shan1.animation"&gt;</code> dst jika elemen animasinya tidak ada</span></span>
+              </label>
+
+              <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:12px">
+                <input type="checkbox" id="fix-encoding" checked style="margin-top:2px;accent-color:var(--accent)">
+                <span><strong>Standarisasi encoding XML declaration</strong><br>
+                <span style="color:var(--text-dim)">Hapus <code>standalone="no"</code> yang bisa bikin parser gagal</span></span>
+              </label>
+
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Log + Output -->
+      <div>
+        <div class="card" style="margin-bottom:20px">
+          <div class="card-header">
+            <div class="card-title"><span class="dot dot-green"></span> Fix Log</div>
+          </div>
+          <div class="card-body">
+            <div id="fix-log">
+              <div class="empty-state">
+                <div class="big">🔧</div>
+                Upload manifest lalu klik Auto Fix
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title"><span class="dot dot-accent"></span> Hasil Fixed Manifest</div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-secondary btn-sm" onclick="copyFixed()">📋 Copy</button>
+              <button class="btn btn-success btn-sm" onclick="downloadFixed()">⬇ Download</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <textarea id="autofix-output" rows="22" readonly placeholder="Manifest yang sudah difix akan muncul di sini..."></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       TAB 4: REFERENSI
+  ══════════════════════════════════════════════════════════ -->
+  <div id="tab-reference" class="panel">
+    <div class="grid2">
+
+      <div>
+        <!-- Variabel sistem bawaan -->
+        <div class="card" style="margin-bottom:20px">
+          <div class="card-header">
+            <div class="card-title"><span class="dot dot-purple"></span> Variabel Sistem Bawaan MIUI</div>
+          </div>
+          <div class="card-body">
+            <table class="var-table">
+              <thead>
+                <tr><th>Variabel</th><th>Nilai</th><th>Keterangan</th></tr>
+              </thead>
+              <tbody id="sysvar-table"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Aturan wajib -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title"><span class="dot dot-pink"></span> Aturan Wajib</div>
+          </div>
+          <div class="card-body">
+            <div class="issue-list" id="rules-list"></div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <!-- Package app shortcuts -->
+        <div class="card" style="margin-bottom:20px">
+          <div class="card-header">
+            <div class="card-title"><span class="dot dot-green"></span> Package App untuk Shortcut</div>
+          </div>
+          <div class="card-body">
+            <table class="var-table">
+              <thead>
+                <tr><th>App</th><th>Package</th><th>Class</th></tr>
+              </thead>
+              <tbody id="pkg-table"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Fungsi ekspresi -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title"><span class="dot dot-warn"></span> Fungsi Ekspresi</div>
+          </div>
+          <div class="card-body">
+            <table class="var-table">
+              <thead>
+                <tr><th>Fungsi</th><th>Penjelasan</th><th>Contoh</th></tr>
+              </thead>
+              <tbody id="expr-table"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════
+// DATA
+// ═══════════════════════════════════════
+
+const SYSTEM_VARS = [
+  ['#hour', '0-11', 'Jam format 12 (tanpa AM/PM)'],
+  ['#hour12', '0-11', 'Jam format 12'],
+  ['#hour24', '0-23', 'Jam format 24'],
+  ['#minute', '0-59', 'Menit'],
+  ['#second', '0-59', 'Detik'],
+  ['#year', '2024', 'Tahun 4 digit'],
+  ['#month', '0-11', '⚠️ 0-based! 0=Januari, 11=Desember'],
+  ['#date', '1-31', 'Tanggal'],
+  ['#day_of_week', '0-6', '0=Minggu, 1=Senin, ..., 6=Sabtu'],
+  ['#battery_level', '0-100', 'Level baterai'],
+  ['#screen_width', 'px', 'Lebar layar dalam pixel'],
+  ['#screen_height', 'px', 'Tinggi layar dalam pixel'],
+  ['#time_format', '0/1', '0=12jam, 1=24jam (setting user)'],
+  ['#ampm', '0/1', '0=AM, 1=PM'],
+  ['#touch_x', 'px', 'Posisi X sentuhan saat ini'],
+  ['#touch_y', 'px', 'Posisi Y sentuhan saat ini'],
+  ['#touch_begin_x', 'px', 'Posisi X awal sentuhan'],
+  ['#touch_begin_y', 'px', 'Posisi Y awal sentuhan'],
+  ['#unlocker.move_y', 'px', 'Jarak drag vertikal (negatif=ke atas)'],
+  ['#weather_temperature', 'int', 'Suhu cuaca (butuh WeatherProvider)'],
+  ['#weather_description', 'string', 'Deskripsi cuaca'],
+];
+
+const PACKAGES = [
+  ['Kamera', 'com.android.camera', 'com.android.camera.Camera'],
+  ['Telepon/Dialer', 'com.android.contacts', 'com.android.contacts.activities.TwelveKeyDialer'],
+  ['SMS', 'com.android.mms', 'com.android.mms.ui.MmsTabActivity'],
+  ['Browser', 'com.android.browser', 'com.android.browser.BrowserActivity'],
+  ['Galeri', 'com.miui.gallery', 'com.miui.gallery.activity.HomePageActivity'],
+  ['Musik MIUI', 'com.miui.player', 'com.miui.player.ui.MusicBrowserActivity'],
+  ['Video MIUI', 'com.miui.videoplayer', 'com.miui.video.global.app.LauncherActivity'],
+  ['Settings', 'com.android.settings', 'com.android.settings.MiuiSettings'],
+  ['WeChat', 'com.tencent.mm', 'com.tencent.mm.ui.LauncherUI'],
+  ['WhatsApp', 'com.whatsapp', 'com.whatsapp.HomeActivity'],
+  ['Instagram', 'com.instagram.android', 'com.instagram.mainactivity.MainActivity'],
+];
+
+const EXPRESSIONS = [
+  ['eq(a,b)', 'Equal — 1 jika a=b, 0 jika tidak', 'eq(#qh,0)'],
+  ['ne(a,b)', 'Not Equal — 1 jika a≠b', 'ne(#qh,0)'],
+  ['gt(a,b)', 'Greater Than — 1 jika a>b', 'gt(#battery,50)'],
+  ['ge(a,b)', 'Greater or Equal — 1 jika a≥b', 'ge(#battery,100)'],
+  ['lt(a,b)', 'Less Than — 1 jika a<b', 'lt(#qh,2)'],
+  ['le(a,b)', 'Less or Equal — 1 jika a≤b', 'le(#qh,1)'],
+  ['ifelse(c,t,f)', 'Ternary — jika c!=0 return t, else f', 'ifelse(eq(#qh,0),1,0)'],
+  ['int(a)', 'Bulatkan ke bawah (floor)', 'int(#hour24/10)'],
+  ['abs(a)', 'Nilai absolut', 'abs(#unlocker.move_y)'],
+  ['max(a,b)', 'Nilai terbesar', 'max(#hour,#hour24)'],
+  ['min(a,b)', 'Nilai terkecil', 'min(#move_y,0)'],
+  ['a%b', 'Modulo (sisa bagi)', '#hour24%10'],
+  ['a*b', 'Perkalian', '#minute*6'],
+  ['a+b', 'Penjumlahan', '#hour24+1'],
+];
+
+const RULES = [
+  { type:'error', icon:'🔴', title:'Var height/width wajib didefinisikan', desc:'Wajib ada <code>&lt;Var name="h/sh"&gt;</code> yang berisi <code>#screen_height</code>. Cek nama yang dipakai sebelum copy snippet dari sumber lain.' },
+  { type:'error', icon:'🔴', title:'Unlocker WAJIB ada dan PALING BAWAH', desc:'Tanpa <code>&lt;Unlocker&gt;</code> atau <code>&lt;Group name="unlocker"&gt;</code> layar tidak bisa dibuka. Harus jadi elemen terakhir sebelum <code>&lt;/Lockscreen&gt;</code>.' },
+  { type:'warn', icon:'🟡', title:'Jangan taruh animasi di dalam Group dengan alpha expression', desc:'Jika <code>alpha="-#yd/540*255"</code> dan <code>#yd</code> tidak terdefinisi, nilainya 0 → seluruh Group invisible.' },
+  { type:'warn', icon:'🟡', title:'Layer ditentukan urutan XML', desc:'Elemen yang ditulis <strong>belakangan</strong> tampil <strong>di atas</strong>. Background harus paling atas di XML, konten di bawahnya.' },
+  { type:'info', icon:'🔵', title:'#month adalah 0-based', desc:'<code>#month = 0</code> berarti Januari. Untuk tampil ke user: gunakan <code>#month+1</code>.' },
+  { type:'info', icon:'🔵', title:'srcid harus integer', desc:'Selalu wrap dengan <code>int()</code>. Contoh: <code>srcid="int(#hour24/10)"</code> bukan <code>srcid="#hour24/10"</code>.' },
+  { type:'ok', icon:'🟢', title:'alpha="255" = fully visible, alpha="0" = invisible', desc:'Rentang alpha: 0–255. Jika Var yang dipakai di alpha tidak terdefinisi → nilainya 0 → invisible.' },
+  { type:'ok', icon:'🟢', title:'SourcesAnimation tanpa hold = loop otomatis', desc:'Tambahkan frame terakhir dengan <code>time="10000000000"</code> jika tidak ingin loop (animasi hold di frame terakhir).' },
+];
+
+// ═══════════════════════════════════════
+// SNIPPETS
+// ═══════════════════════════════════════
+
+const SNIPPETS = [
+  {
+    id: 'toggle_anim',
+    icon: '🎬',
+    name: 'Animasi Toggle (m3)',
+    desc: 'Animasi loop dengan toggle button, support 2–3 mode. Siap pakai dengan koordinat responsif.',
+    tag: 'Animation + Button',
+    fields: [
+      { id:'heightVar', label:'Nama var HEIGHT di tema', placeholder:'h atau sh', default:'h' },
+      { id:'modes', label:'Jumlah mode', type:'select', options:['2 mode (0 dan 1)','3 mode (0, 1, dan 2)'], default:0 },
+      { id:'frames', label:'Jumlah frame animasi', placeholder:'misal: 9', default:'9' },
+      { id:'frameMs', label:'Durasi per frame (ms)', placeholder:'misal: 120', default:'120' },
+      { id:'folder', label:'Folder animasi', placeholder:'misal: one/m3', default:'one/m3' },
+      { id:'basename', label:'Nama file (tanpa nomor)', placeholder:'misal: m_', default:'m_' },
+    ],
+    generate: (f) => {
+      const hv = f.heightVar || 'h';
+      const maxMode = f.modes && f.modes.includes('3') ? 2 : 1;
+      const frames = parseInt(f.frames) || 9;
+      const ms = parseInt(f.frameMs) || 120;
+      const folder = f.folder || 'one/m3';
+      const base = f.basename || 'm_';
+      const toggleExpr = maxMode === 2
+        ? `ifelse(le(#qh,2),#qh+1,0)`
+        : `ifelse(le(#qh,1),#qh+1,0)`;
+
+      let frameSources = '';
+      for (let i = 1; i <= frames; i++) {
+        frameSources += `        <Source src="${folder}/${base}${i}.png" time="${i * ms}"/>\n`;
+      }
+
+      let modeBlocks = '';
+      for (let m = 0; m <= maxMode; m++) {
+        modeBlocks += `
+    <!-- Animasi — mode qh=${m} -->
+    <Image src="${folder}/${base}1.png" visibility="eq(#qh,${m})" x="0" y="0+(#${hv}-2460)/2">
+      <SourcesAnimation>
+${frameSources}      </SourcesAnimation>
+    </Image>\n`;
+      }
+
+      return `<!-- [WAJIB] Tambahkan di bagian Var (atas manifest): -->
+<!-- <Var name="qh" expression="0"/> -->
+
+<Group alpha="255">
+  <!-- Button toggle -->
+  <Button h="151" w="335" x="373" y="1045+(#${hv}-2460)/2">
+    <Triggers>
+      <Trigger action="up">
+        <VariableCommand expression="${toggleExpr}" name="qh" persist="true"/>
+      </Trigger>
+    </Triggers>
+  </Button>
+${modeBlocks}
+</Group>`;
+    }
+  },
+  {
+    id: 'app_shortcut',
+    icon: '📱',
+    name: 'Shortcut Aplikasi',
+    desc: 'Button tap-to-launch langsung ke aplikasi + unlock layar otomatis.',
+    tag: 'Button + Intent',
+    fields: [
+      { id:'appPkg', label:'Package app', placeholder:'com.android.camera', default:'com.android.camera' },
+      { id:'appClass', label:'Class app', placeholder:'com.android.camera.Camera', default:'com.android.camera.Camera' },
+      { id:'btnX', label:'Posisi X', placeholder:'785', default:'785' },
+      { id:'btnY', label:'Posisi Y (pakai #h jika perlu)', placeholder:'#h-235', default:'#h-235' },
+      { id:'btnW', label:'Lebar button', placeholder:'157', default:'157' },
+      { id:'btnH', label:'Tinggi button', placeholder:'157', default:'157' },
+    ],
+    generate: (f) => {
+      return `<Button x="${f.btnX||785}" y="${f.btnY||'#h-235'}" w="${f.btnW||157}" h="${f.btnH||157}">
+  <Triggers>
+    <Trigger action="up">
+      <IntentCommand
+          action="android.intent.action.MAIN"
+          package="${f.appPkg||'com.android.camera'}"
+          class="${f.appClass||'com.android.camera.Camera'}"/>
+      <ExternCommand command="unlock"/>
+    </Trigger>
+  </Triggers>
+</Button>`;
+    }
+  },
+  {
+    id: 'clock_digital',
+    icon: '🕐',
+    name: 'Jam Digital (per digit)',
+    desc: 'Jam digital sprite-based dengan kontrol penuh per digit. Support format 12/24 jam.',
+    tag: 'Image + srcid',
+    fields: [
+      { id:'format', label:'Format jam', type:'select', options:['24 jam (#hour24)','12 jam (#hour12)'], default:0 },
+      { id:'spriteSrc', label:'Path sprite angka', placeholder:'time/t.png', default:'time/t.png' },
+      { id:'dotSrc', label:'Path separator (titik dua)', placeholder:'time/dot.png', default:'time/dot.png' },
+      { id:'startX', label:'X awal (digit pertama)', placeholder:'100', default:'100' },
+      { id:'startY', label:'Y', placeholder:'200', default:'200' },
+      { id:'digitW', label:'Lebar per digit (px)', placeholder:'80', default:'80' },
+    ],
+    generate: (f) => {
+      const hourVar = f.format && f.format.includes('12') ? '#hour12' : '#hour24';
+      const x = parseInt(f.startX) || 100;
+      const y = f.startY || '200';
+      const dw = parseInt(f.digitW) || 80;
+      const src = f.spriteSrc || 'time/t.png';
+      const dot = f.dotSrc || 'time/dot.png';
+      const x2 = x + dw, xdot = x + dw*2, x3 = x + dw*2 + 20, x4 = x + dw*3 + 20;
+      return `<!-- Jam digit 1 -->
+<Image src="${src}" srcid="int(${hourVar}/10)" x="${x}" y="${y}"/>
+<!-- Jam digit 2 -->
+<Image src="${src}" srcid="int(${hourVar}%10)" x="${x2}" y="${y}"/>
+<!-- Separator -->
+<Image src="${dot}" x="${xdot}" y="${y}"/>
+<!-- Menit digit 1 -->
+<Image src="${src}" srcid="int(#minute/10)" x="${x3}" y="${y}"/>
+<!-- Menit digit 2 -->
+<Image src="${src}" srcid="int(#minute%10)" x="${x4}" y="${y}"/>`;
+    }
+  },
+  {
+    id: 'clock_analog',
+    icon: '🕰️',
+    name: 'Jam Analog (jarum putar)',
+    desc: 'Jam analog dengan 3 jarum (jam, menit, detik) dan titik tengah. Lengkap dengan pivot dan rotasi.',
+    tag: 'Image + rotation',
+    fields: [
+      { id:'dialSrc', label:'Path background dial', placeholder:'analog/dial.png', default:'analog/dial.png' },
+      { id:'hourSrc', label:'Path jarum jam', placeholder:'analog/hour.png', default:'analog/hour.png' },
+      { id:'minSrc', label:'Path jarum menit', placeholder:'analog/minute.png', default:'analog/minute.png' },
+      { id:'secSrc', label:'Path jarum detik', placeholder:'analog/second.png', default:'analog/second.png' },
+      { id:'dotSrc2', label:'Path titik tengah', placeholder:'analog/dot.png', default:'analog/dot.png' },
+      { id:'centerX', label:'Titik tengah X', placeholder:'540', default:'540' },
+      { id:'centerY', label:'Titik tengah Y', placeholder:'900', default:'900' },
+      { id:'pivotHourW', label:'Pivot jarum jam (setengah lebar)', placeholder:'6', default:'6' },
+      { id:'pivotHourH', label:'Pivot jarum jam (panjang dari pusat)', placeholder:'40', default:'40' },
+    ],
+    generate: (f) => {
+      const cx = parseInt(f.centerX) || 540;
+      const cy = parseInt(f.centerY) || 900;
+      const ph = parseInt(f.pivotHourH) || 40;
+      const pw = parseInt(f.pivotHourW) || 6;
+      return `<!-- Background jam analog -->
+<Image src="${f.dialSrc||'analog/dial.png'}" x="${cx-100}" y="${cy-100}"/>
+
+<!-- Jarum jam: 1 jam = 30°, koreksi menit = 0.5° per menit -->
+<Image src="${f.hourSrc||'analog/hour.png'}"
+       x="${cx-pw}" y="${cy-ph}"
+       pivotX="${pw}" pivotY="${ph}"
+       rotation="#hour12*30+#minute*0.5"/>
+
+<!-- Jarum menit: 1 menit = 6° -->
+<Image src="${f.minSrc||'analog/minute.png'}"
+       x="${cx-pw}" y="${cy-ph-20}"
+       pivotX="${pw}" pivotY="${ph+20}"
+       rotation="#minute*6"/>
+
+<!-- Jarum detik: 1 detik = 6° -->
+<Image src="${f.secSrc||'analog/second.png'}"
+       x="${cx-4}" y="${cy-ph-30}"
+       pivotX="4" pivotY="${ph+30}"
+       rotation="#second*6"/>
+
+<!-- Titik tengah (di atas semua jarum) -->
+<Image src="${f.dotSrc2||'analog/dot.png'}" x="${cx-6}" y="${cy-6}"/>`;
+    }
+  },
+  {
+    id: 'battery',
+    icon: '🔋',
+    name: 'Indikator Baterai',
+    desc: 'Angka persen baterai dengan posisi digit dinamis (geser otomatis jika 100%). Menggunakan sprite PNG.',
+    tag: 'Image + battery_level',
+    fields: [
+      { id:'bgSrc', label:'Path background baterai', placeholder:'battery/menu2.png', default:'battery/menu2.png' },
+      { id:'progSrc', label:'Path progress bar (sprite 0-20)', placeholder:'battery/progress.png', default:'battery/progress.png' },
+      { id:'digitSrc', label:'Path sprite angka (0-9)', placeholder:'battery/d.png', default:'battery/d.png' },
+      { id:'pctSrc', label:'Path simbol %', placeholder:'battery/d_percent.png', default:'battery/d_percent.png' },
+      { id:'batX', label:'X awal angka', placeholder:'801', default:'801' },
+      { id:'batY', label:'Y angka', placeholder:'382', default:'382' },
+      { id:'digitGap', label:'Jarak antar digit (px)', placeholder:'23', default:'23' },
+    ],
+    generate: (f) => {
+      const x = f.batX || '801';
+      const y = f.batY || '382';
+      const g = f.digitGap || '23';
+      const bg = f.bgSrc || 'battery/menu2.png';
+      const pr = f.progSrc || 'battery/progress.png';
+      const d = f.digitSrc || 'battery/d.png';
+      const pct = f.pctSrc || 'battery/d_percent.png';
+      return `<!-- Background baterai -->
+<Image src="${bg}" x="${x}" y="${y}"/>
+
+<!-- Progress bar (sprite 0-20, satu frame per 5%) -->
+<Image src="${pr}" x="618" y="447" srcid="int(#battery_level/5)"/>
+
+<!-- Digit ratusan (hanya muncul jika 100%) -->
+<Image src="${d}" x="${x}" y="${y}"
+       srcid="int(#battery_level/100)"
+       visibility="ge(#battery_level,100)"/>
+
+<!-- Digit puluhan (geser kanan jika ada ratusan) -->
+<Image src="${d}" x="${x}+${g}*ge(#battery_level,100)" y="${y}"
+       srcid="int((#battery_level%100)/10)"
+       visibility="ge(#battery_level,10)"/>
+
+<!-- Digit satuan -->
+<Image src="${d}" x="${x}+${g}*ge(#battery_level,100)+${g}*ge(#battery_level,10)" y="${y}"
+       srcid="int(#battery_level%10)"/>
+
+<!-- Simbol % -->
+<Image src="${pct}" x="${x}+${g}*ge(#battery_level,100)+${g}*ge(#battery_level,10)+${g}" y="${y}"/>`;
+    }
+  },
+  {
+    id: 'unlocker',
+    icon: '🔓',
+    name: 'Unlocker (Swipe Unlock)',
+    desc: 'Sistem unlock layar. Ada 2 tipe: modern (support parallax) dan klasik (kompatibel semua MIUI).',
+    tag: 'Unlocker',
+    fields: [
+      { id:'unlockType', label:'Tipe unlocker', type:'select', options:['Modern (Unlocker tag + parallax)','Klasik (Group + Button)'], default:0 },
+      { id:'swipeMin', label:'Jarak swipe minimum (px)', placeholder:'300', default:'300' },
+    ],
+    generate: (f) => {
+      const dist = f.swipeMin || '300';
+      if (!f.unlockType || f.unlockType.includes('Modern')) {
+        return `<!-- [WAJIB] Taruh PALING BAWAH sebelum </Lockscreen> -->
+<!-- Modern Unlocker: support #unlocker.move_y untuk parallax -->
+<Unlocker name="unlocker" bounceInitSpeed="1000" bounceAcceleration="1600">
+  <EndPoint h="#touch_begin_y-${dist}" w="#screen_width" x="0" y="0"/>
+  <StartPoint h="2" w="2" x="#touch_begin_x" y="#touch_begin_y"/>
+</Unlocker>
+
+<!-- Cara pakai parallax di Group konten: -->
+<!-- <Group alpha="255-(abs(#unlocker.move_y)*0.15)" y="min(#unlocker.move_y*0.35,0)"> -->`;
+      } else {
+        return `<!-- [WAJIB] Taruh PALING BAWAH sebelum </Lockscreen> -->
+<!-- Klasik Unlocker: lebih kompatibel, tanpa bounce animation -->
+<Group name="unlocker">
+  <Button h="#screen_height" w="#screen_width">
+    <Triggers>
+      <Trigger action="up">
+        <ExternCommand command="unlock" condition="ge(#touch_begin_y-#touch_y,${dist})"/>
+      </Trigger>
+    </Triggers>
+  </Button>
+</Group>`;
+      }
+    }
+  },
+  {
+    id: 'popup_anim',
+    icon: '✨',
+    name: 'Animasi Popup / Fade',
+    desc: 'Elemen yang muncul dengan animasi alpha saat layar kunci tampil. Bisa fade in, fade out, atau blink.',
+    tag: 'AlphaAnimation',
+    fields: [
+      { id:'popSrc', label:'Path gambar', placeholder:'overlay/icon.png', default:'overlay/icon.png' },
+      { id:'popX', label:'X', placeholder:'300', default:'300' },
+      { id:'popY', label:'Y', placeholder:'400', default:'400' },
+      { id:'popType', label:'Tipe animasi', type:'select', options:['Fade in (muncul pelan)','Popup lalu fade out','Blink (loop terus)'], default:0 },
+      { id:'popDuration', label:'Durasi total (ms)', placeholder:'1000', default:'1000' },
+    ],
+    generate: (f) => {
+      const src = f.popSrc || 'overlay/icon.png';
+      const x = f.popX || '300';
+      const y = f.popY || '400';
+      const dur = parseInt(f.popDuration) || 1000;
+      let anim = '';
+      if (!f.popType || f.popType.includes('Fade in')) {
+        anim = `      <Alpha a="0"   time="0"/>
+      <Alpha a="255" time="${dur}"/>
+      <Alpha a="255" time="10000000000"/>`;
+      } else if (f.popType.includes('Popup')) {
+        const hold = dur * 2;
+        const end = dur * 3;
+        anim = `      <Alpha a="0"   time="0"/>
+      <Alpha a="255" time="${dur}"/>
+      <Alpha a="255" time="${hold}"/>
+      <Alpha a="0"   time="${end}"/>
+      <Alpha a="0"   time="10000000000"/>`;
+      } else {
+        const half = Math.round(dur/2);
+        anim = `      <Alpha a="255" time="0"/>
+      <Alpha a="0"   time="${half}"/>
+      <Alpha a="255" time="${dur}"/>
+      <!-- Tanpa hold = loop blink terus -->`;
+      }
+      return `<Image src="${src}" x="${x}" y="${y}">
+  <AlphaAnimation>
+${anim}
+  </AlphaAnimation>
+</Image>`;
+    }
+  },
+  {
+    id: 'date_display',
+    icon: '📅',
+    name: 'Tanggal & Hari',
+    desc: 'Tampilan bulan/tanggal/hari menggunakan sprite PNG. Ingat: #month adalah 0-based!',
+    tag: 'Image + srcid',
+    fields: [
+      { id:'dateSrc', label:'Path sprite angka', placeholder:'date/dn.png', default:'date/dn.png' },
+      { id:'sepSrc', label:'Path separator (/ atau .)', placeholder:'date/xg.png', default:'date/xg.png' },
+      { id:'weekSrc', label:'Path sprite hari (0-6)', placeholder:'week/ew.png', default:'week/ew.png' },
+      { id:'dateX', label:'X awal', placeholder:'598', default:'598' },
+      { id:'dateY', label:'Y', placeholder:'256', default:'256' },
+      { id:'dateGap', label:'Jarak antar digit (px)', placeholder:'28', default:'28' },
+    ],
+    generate: (f) => {
+      const src = f.dateSrc || 'date/dn.png';
+      const sep = f.sepSrc || 'date/xg.png';
+      const week = f.weekSrc || 'week/ew.png';
+      const x = parseInt(f.dateX) || 598;
+      const y = f.dateY || '256';
+      const g = parseInt(f.dateGap) || 28;
+      return `<!-- Bulan: #month+1 karena 0-based (0=Januari) -->
+<Image src="${src}" x="${x}" y="${y}" srcid="int((#month+1)/10)"/>
+<Image src="${src}" x="${x+g}" y="${y}" srcid="int((#month+1)%10)"/>
+<!-- Separator -->
+<Image src="${sep}" x="${x+g*2}" y="${y}"/>
+<!-- Tanggal -->
+<Image src="${src}" x="${x+g*3}" y="${y}" srcid="int(#date/10)"/>
+<Image src="${src}" x="${x+g*4}" y="${y}" srcid="int(#date%10)"/>
+<!-- Hari (0=Minggu ... 6=Sabtu) -->
+<Image src="${week}" x="${x+g*5+10}" y="${y}" srcid="#day_of_week"/>`;
+    }
+  },
+];
+
+// ═══════════════════════════════════════
+// ANALYZER
+// ═══════════════════════════════════════
+
+function analyzeManifest() {
+  const xml = document.getElementById('inputManifest').value.trim();
+  if (!xml) { toast('Paste manifest dulu!'); return; }
+
+  const issues = [];
+  const vars = [];
+
+  // Count elements
+  const countTag = (tag) => (xml.match(new RegExp(`<${tag}[\\s>]`, 'g')) || []).length;
+  const varCount = countTag('Var');
+  const imgCount = countTag('Image');
+  const grpCount = countTag('Group');
+  const btnCount = countTag('Button');
+  const animCount = (xml.match(/SourcesAnimation|AlphaAnimation|PositionAnimation|RotationAnimation|VariableAnimation/g) || []).length;
+
+  // Parse declared vars
+  const varMatches = [...xml.matchAll(/<Var\s+(?:[^>]*\s+)?name="([^"]+)"[^>]*(?:expression="([^"]*)")?/g)];
+  for (const m of varMatches) {
+    vars.push({ name: m[1], expr: m[2] || '(no expression)' });
+  }
+
+  const declaredVars = new Set(vars.map(v => v.name));
+
+  // ─── CHECKS ───
+
+  // 1. Has Lockscreen tag
+  if (!xml.includes('<Lockscreen')) {
+    issues.push({ type:'error', icon:'🔴', title:'Bukan manifest Lockscreen', desc:'Tag <code>&lt;Lockscreen&gt;</code> tidak ditemukan. Pastikan paste manifest yang benar.' });
+  }
+
+  // 2. Unlocker
+  const hasUnlocker = xml.includes('<Unlocker') || xml.includes('name="unlocker"') || xml.includes("command=\"unlock\"");
+  if (!hasUnlocker) {
+    issues.push({ type:'error', icon:'🔴', title:'Tidak ada sistem Unlock', desc:'Tidak ditemukan <code>&lt;Unlocker&gt;</code> atau <code>command="unlock"</code>. Layar tidak bisa dibuka!' });
+  } else {
+    // Check if unlocker is last
+    const lastUnlockPos = Math.max(xml.lastIndexOf('<Unlocker'), xml.lastIndexOf('name="unlocker"'));
+    const lastLockscreenClose = xml.lastIndexOf('</Lockscreen>');
+    const afterUnlocker = xml.substring(lastUnlockPos, lastLockscreenClose);
+    const elemAfter = (afterUnlocker.match(/<(Image|Group|Button)\s/g) || []);
+    if (elemAfter.length > 0) {
+      issues.push({ type:'warn', icon:'🟡', title:'Ada elemen setelah Unlocker', desc:`Ditemukan ${elemAfter.length} elemen setelah Unlocker. Unlocker sebaiknya jadi elemen terakhir sebelum <code>&lt;/Lockscreen&gt;</code>.` });
+    } else {
+      issues.push({ type:'ok', icon:'🟢', title:'Unlocker ditemukan', desc:'Sistem unlock tersedia.' });
+    }
+  }
+
+  // 3. Screen height var
+  const hasScreenHeight = xml.includes('#screen_height');
+  const heightVarName = vars.find(v => v.expr && v.expr.includes('screen_height'));
+  if (!heightVarName && !hasScreenHeight) {
+    issues.push({ type:'warn', icon:'🟡', title:'Var screen_height tidak terdeteksi', desc:'Tidak ada Var yang berisi <code>#screen_height</code>. Posisi responsif tidak akan berfungsi jika menggunakan <code>#h</code> atau <code>#sh</code>.' });
+  } else {
+    const hvn = heightVarName ? heightVarName.name : 'screen_height (langsung)';
+    issues.push({ type:'ok', icon:'🟢', title:`Var height: #${hvn}`, desc:`Screen height tersedia sebagai <code>#${hvn}</code>.` });
+  }
+
+  // 4. Cek referensi var yang tidak terdefinisi di expression
+  const allRefs = [...xml.matchAll(/#([a-zA-Z_][a-zA-Z0-9_]*)/g)].map(m => m[1]);
+  const systemVarNames = new Set(['screen_width','screen_height','hour','hour12','hour24','minute','second','year','month','date','day_of_week','battery_level','time_format','ampm','touch_x','touch_y','touch_begin_x','touch_begin_y','time','csz','unlocker','weather_temperature','weather_description','weather_id','weather_type','hasweather','hasnotifications','bf','set','qh','noticeDown','YY','appmode1','appmode2']);
+  const undefinedVars = new Set();
+  for (const ref of allRefs) {
+    if (!declaredVars.has(ref) && !systemVarNames.has(ref) && !ref.includes('.')) {
+      undefinedVars.add(ref);
+    }
+  }
+  if (undefinedVars.size > 0) {
+    const list = [...undefinedVars].slice(0,8).map(v => `<code>#${v}</code>`).join(', ');
+    issues.push({ type:'warn', icon:'🟡', title:`${undefinedVars.size} referensi var tidak terdefinisi`, desc:`Var yang dipakai tapi tidak dideklarasikan: ${list}${undefinedVars.size > 8 ? ` dan ${undefinedVars.size-8} lainnya` : ''}.<br>Jika dipakai di <code>alpha=</code>, nilainya 0 → invisible!` });
+  }
+
+  // 5. Alpha expression dengan var tidak terdefinisi
+  const alphaExprs = [...xml.matchAll(/alpha="([^"]*)"/g)];
+  for (const [, expr] of alphaExprs) {
+    if (expr === '255' || expr === '0' || !isNaN(expr)) continue;
+    const refs = [...expr.matchAll(/#([a-zA-Z_][a-zA-Z0-9_]*)/g)].map(m => m[1]);
+    for (const ref of refs) {
+      if (!declaredVars.has(ref) && !systemVarNames.has(ref) && !ref.includes('.')) {
+        issues.push({ type:'error', icon:'🔴', title:`Bahaya: alpha pakai #${ref} yang tidak terdefinisi`, desc:`Expression: <code>alpha="${expr}"</code><br>Karena <code>#${ref}</code> = undefined = 0, maka alpha = 0 → <strong>Group/Image INVISIBLE!</strong><br>Ini adalah root cause paling umum elemen tidak kelihatan.` });
+        break;
+      }
+    }
+  }
+
+  // 6. srcid tanpa int()
+  const srcids = [...xml.matchAll(/srcid="([^"]*)"/g)];
+  let srcidWarn = false;
+  for (const [, expr] of srcids) {
+    if (expr.includes('#') && !expr.includes('int(') && !expr.includes('ifelse')) {
+      if (!srcidWarn) {
+        issues.push({ type:'warn', icon:'🟡', title:'srcid tanpa int()', desc:`Ditemukan <code>srcid="${expr}"</code> tanpa <code>int()</code>. Bisa menyebabkan frame salah atau tidak tampil. Gunakan <code>srcid="int(${expr})"</code>.` });
+        srcidWarn = true;
+      }
+    }
+  }
+
+  // 7. month display check
+  if (xml.includes('#month') && !xml.includes('#month+1') && !xml.includes('#month,')) {
+    const monthRefs = [...xml.matchAll(/srcid="[^"]*#month[^"]*"/g)];
+    if (monthRefs.length > 0) {
+      issues.push({ type:'info', icon:'🔵', title:'Perhatian: #month adalah 0-based', desc:'<code>#month</code> digunakan di srcid. Pastikan sudah ditambah +1 untuk tampilan ke user. Contoh: <code>srcid="int((#month+1)/10)"</code>' });
+    }
+  }
+
+  // 8. frameRate
+  const frMatch = xml.match(/frameRate="(\d+)"/);
+  if (frMatch) {
+    const fr = parseInt(frMatch[1]);
+    if (fr > 30) {
+      issues.push({ type:'info', icon:'🔵', title:`frameRate=${fr} (lebih boros baterai)`, desc:`frameRate="60" lebih halus animasinya tapi lebih boros. Pertimbangkan <code>frameRate="30"</code> untuk efisiensi.` });
+    }
+  }
+
+  // Update stats
+  document.getElementById('stats-container').style.display = 'flex';
+  document.getElementById('st-vars').textContent = varCount;
+  document.getElementById('st-images').textContent = imgCount;
+  document.getElementById('st-groups').textContent = grpCount;
+  document.getElementById('st-buttons').textContent = btnCount;
+  document.getElementById('st-anims').textContent = animCount;
+  const errCount = issues.filter(i => i.type === 'error').length;
+  const stIssues = document.getElementById('st-issues');
+  stIssues.textContent = errCount;
+  stIssues.className = 'stat-val ' + (errCount > 0 ? 'error' : 'ok');
+
+  // Render issues
+  const issueOut = document.getElementById('issue-output');
+  if (issues.length === 0) {
+    issueOut.innerHTML = '<div class="issue ok"><span class="issue-icon">✅</span><div class="issue-text"><strong>Tidak ada issue ditemukan</strong>Manifest terlihat valid.</div></div>';
+  } else {
+    issueOut.innerHTML = '<div class="issue-list">' + issues.map(i =>
+      `<div class="issue ${i.type}">
+        <span class="issue-icon">${i.icon}</span>
+        <div class="issue-text"><strong>${i.title}</strong><span>${i.desc}</span></div>
+      </div>`
+    ).join('') + '</div>';
+  }
+
+  // Render var table
+  const varOut = document.getElementById('var-output');
+  if (vars.length === 0) {
+    varOut.innerHTML = '<div class="empty-state" style="padding:20px">Tidak ada Var ditemukan</div>';
+  } else {
+    varOut.innerHTML = `<table class="var-table">
+      <thead><tr><th>Nama</th><th>Expression</th></tr></thead>
+      <tbody>${vars.map(v => `<tr><td><code>#${v.name}</code></td><td style="color:var(--text-dim);font-size:11px">${v.expr.length > 60 ? v.expr.substring(0,60)+'...' : v.expr}</td></tr>`).join('')}</tbody>
+    </table>`;
+  }
+
+  toast(`Analisa selesai — ${issues.length} issue ditemukan`);
+}
+
+function clearAll() {
+  document.getElementById('inputManifest').value = '';
+  document.getElementById('issue-output').innerHTML = '<div class="empty-state"><div class="big">🔎</div>Paste manifest lalu klik Analyze</div>';
+  document.getElementById('var-output').innerHTML = '<div class="empty-state" style="padding:20px">Belum ada data</div>';
+  document.getElementById('stats-container').style.display = 'none';
+}
+
+function loadSample() {
+  document.getElementById('inputManifest').value = `<?xml version="1.0" encoding="UTF-8"?>
+<Lockscreen frameRate="60" screenWidth="1080" version="1" vibrate="false">
+    <Var name="h" expression="#screen_height"/>
+    <Var name="w" expression="#screen_width"/>
+    <Var name="qh" expression="0"/>
+
+    <Image src="bg.png" x="0" y="0"/>
+
+    <Group alpha="255-(abs(#unlocker.move_y)*0.15)" y="min(#unlocker.move_y*0.35,0)">
+        <Image src="time/t.png" srcid="int(#hour24/10)" x="100" y="200"/>
+        <Image src="time/t.png" srcid="int(#hour24%10)" x="180" y="200"/>
+    </Group>
+
+    <Group alpha="255">
+        <Button h="151" w="335" x="373" y="1045+(#h-2460)/2">
+            <Triggers>
+                <Trigger action="up">
+                    <VariableCommand expression="ifelse(le(#qh,1),#qh+1,0)" name="qh" persist="true"/>
+                </Trigger>
+            </Triggers>
+        </Button>
+        <Image src="one/m3/m.png" visibility="eq(#qh,0)" x="240" y="523+(#h-2460)/2">
+            <SourcesAnimation>
+                <Source src="one/m3/m_1.png" time="120"/>
+                <Source src="one/m3/m_9.png" time="1080"/>
+            </SourcesAnimation>
+        </Image>
+    </Group>
+
+    <Unlocker name="unlocker" bounceInitSpeed="1000" bounceAcceleration="1600">
+        <EndPoint h="#touch_begin_y-300" w="#screen_width" x="0" y="0"/>
+        <StartPoint h="2" w="2" x="#touch_begin_x" y="#touch_begin_y"/>
+    </Unlocker>
+</Lockscreen>`;
+  toast('Sample manifest dimuat');
+}
+
+// ═══════════════════════════════════════
+// BUILDER
+// ═══════════════════════════════════════
+
+function initSnippets() {
+  const grid = document.getElementById('snippet-grid');
+  grid.innerHTML = SNIPPETS.map((s,i) => `
+    <div class="snippet-card" onclick="selectSnippet(${i})">
+      <div class="snippet-name">${s.icon} ${s.name}</div>
+      <div class="snippet-desc">${s.desc}</div>
+      <div class="snippet-tag">${s.tag}</div>
+    </div>
+  `).join('');
+}
+
+let currentSnippet = null;
+
+function selectSnippet(idx) {
+  currentSnippet = SNIPPETS[idx];
+  const cfg = document.getElementById('snippet-config');
+
+  cfg.innerHTML = `
+    <div class="section-label"><span class="dot dot-purple"></span> ${currentSnippet.icon} ${currentSnippet.name}</div>
+    <p style="font-size:12px;color:var(--text-dim);margin-bottom:16px;line-height:1.6">${currentSnippet.desc}</p>
+    ${currentSnippet.fields.map(field => `
+      <div class="form-group">
+        <label class="form-label">${field.label}</label>
+        ${field.type === 'select'
+          ? `<select class="form-input" id="sf_${field.id}">
+              ${field.options.map((o,i) => `<option value="${o}" ${i === (field.default||0) ? 'selected' : ''}>${o}</option>`).join('')}
+             </select>`
+          : `<input class="form-input" id="sf_${field.id}" placeholder="${field.placeholder||''}" value="${field.default||''}">`
+        }
+      </div>
+    `).join('')}
+    <button class="btn btn-primary" onclick="generateSnippet()" style="margin-top:8px">▶ Generate XML</button>
+  `;
+
+  document.getElementById('snippet-preview').style.display = 'none';
+}
+
+function generateSnippet() {
+  if (!currentSnippet) return;
+  const fields = {};
+  for (const f of currentSnippet.fields) {
+    const el = document.getElementById('sf_' + f.id);
+    if (el) fields[f.id] = el.value;
+  }
+  const xml = currentSnippet.generate(fields);
+  document.getElementById('snippet-output').value = xml;
+  document.getElementById('snippet-preview').style.display = 'block';
+}
+
+function copySnippet() {
+  const val = document.getElementById('snippet-output').value;
+  if (!val) { toast('Generate snippet dulu!'); return; }
+  navigator.clipboard.writeText(val).then(() => toast('Copied ke clipboard!'));
+}
+
+// ═══════════════════════════════════════
+// CONVERTER
+// ═══════════════════════════════════════
+
+function convertVars() {
+  const input = document.getElementById('conv-input').value;
+  if (!input) { toast('Paste XML dulu!'); return; }
+
+  const oldH = document.getElementById('oldH').value.trim() || 'sh';
+  const newH = document.getElementById('newH').value.trim() || 'h';
+  const oldW = document.getElementById('oldW').value.trim() || 'sw';
+  const newW = document.getElementById('newW').value.trim() || 'w';
+
+  let result = input;
+  let countH = 0, countW = 0;
+
+  // Replace #oldH dengan #newH (word boundary)
+  const regH = new RegExp(`#${oldH}\\b`, 'g');
+  result = result.replace(regH, (m) => { countH++; return `#${newH}`; });
+
+  const regW = new RegExp(`#${oldW}\\b`, 'g');
+  result = result.replace(regW, (m) => { countW++; return `#${newW}`; });
+
+  document.getElementById('conv-output').value = result;
+
+  const log = document.getElementById('conv-log');
+  log.innerHTML = `
+    <div class="issue ${countH+countW > 0 ? 'ok' : 'info'}">
+      <span class="issue-icon">${countH+countW > 0 ? '✅' : 'ℹ️'}</span>
+      <div class="issue-text">
+        <strong>Konversi selesai</strong>
+        <code>#${oldH}</code> → <code>#${newH}</code>: <strong>${countH}</strong> penggantian<br>
+        <code>#${oldW}</code> → <code>#${newW}</code>: <strong>${countW}</strong> penggantian
+      </div>
+    </div>`;
+
+  if (countH + countW === 0) {
+    toast('Tidak ada yang dikonversi — cek nama var');
+  } else {
+    toast(`${countH + countW} referensi dikonversi!`);
+  }
+}
+
+function copyConv() {
+  const val = document.getElementById('conv-output').value;
+  if (!val) { toast('Konversi dulu!'); return; }
+  navigator.clipboard.writeText(val).then(() => toast('Copied!'));
+}
+
+// ═══════════════════════════════════════
+// REFERENCE
+// ═══════════════════════════════════════
+
+function initReference() {
+  // System vars
+  const sysTable = document.getElementById('sysvar-table');
+  sysTable.innerHTML = SYSTEM_VARS.map(([v,val,desc]) =>
+    `<tr><td><code>${v}</code></td><td style="color:var(--accent2)">${val}</td><td style="color:var(--text-dim);font-size:11px">${desc}</td></tr>`
+  ).join('');
+
+  // Packages
+  const pkgTable = document.getElementById('pkg-table');
+  pkgTable.innerHTML = PACKAGES.map(([app,pkg,cls]) =>
+    `<tr><td style="color:var(--accent3)">${app}</td><td style="font-size:11px"><code>${pkg}</code></td><td style="font-size:10px;color:var(--text-dim)">${cls}</td></tr>`
+  ).join('');
+
+  // Expressions
+  const exprTable = document.getElementById('expr-table');
+  exprTable.innerHTML = EXPRESSIONS.map(([fn,desc,ex]) =>
+    `<tr><td><code>${fn}</code></td><td style="font-size:11px;color:var(--text-dim)">${desc}</td><td><code style="color:var(--accent2)">${ex}</code></td></tr>`
+  ).join('');
+
+  // Rules
+  const rulesList = document.getElementById('rules-list');
+  rulesList.innerHTML = RULES.map(r =>
+    `<div class="issue ${r.type}">
+      <span class="issue-icon">${r.icon}</span>
+      <div class="issue-text"><strong>${r.title}</strong><span>${r.desc}</span></div>
+    </div>`
+  ).join('');
+}
+
+// ═══════════════════════════════════════
+// TABS & UTILS
+// ═══════════════════════════════════════
+
+function switchTab(id) {
+  const ids = ['analyzer','autofix','builder','converter','reference'];
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    t.classList.toggle('active', ids[i] === id);
+  });
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+}
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ═══════════════════════════════════════
+// AUTO FIX
+// ═══════════════════════════════════════
+
+function handleFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  document.getElementById('filename').textContent = '📄 ' + file.name;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    document.getElementById('autofix-input').value = ev.target.result;
+    toast('File dimuat: ' + file.name);
+  };
+  reader.readAsText(file);
+}
+
+// Drag & drop
+document.addEventListener('DOMContentLoaded', () => {
+  const dz = document.getElementById('dropzone');
+  if (!dz) return;
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.style.borderColor = 'var(--accent)'; dz.style.background = 'rgba(124,106,255,0.05)'; });
+  dz.addEventListener('dragleave', () => { dz.style.borderColor = 'var(--border)'; dz.style.background = ''; });
+  dz.addEventListener('drop', e => {
+    e.preventDefault();
+    dz.style.borderColor = 'var(--border)'; dz.style.background = '';
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+    document.getElementById('filename').textContent = '📄 ' + file.name;
+    const reader = new FileReader();
+    reader.onload = ev => { document.getElementById('autofix-input').value = ev.target.result; toast('File dimuat: ' + file.name); };
+    reader.readAsText(file);
+  });
+});
+
+function clearAutoFix() {
+  document.getElementById('autofix-input').value = '';
+  document.getElementById('autofix-output').value = '';
+  document.getElementById('filename').textContent = '';
+  document.getElementById('fix-log').innerHTML = '<div class="empty-state"><div class="big">🔧</div>Upload manifest lalu klik Auto Fix</div>';
+}
+
+function runAutoFix() {
+  let xml = document.getElementById('autofix-input').value.trim();
+  if (!xml) { toast('Upload atau paste manifest dulu!'); return; }
+
+  const logs = [];
+  let fixCount = 0;
+
+  // ─── Parse declared vars ───
+  const declaredVars = new Set();
+  const systemVarNames = new Set(['screen_width','screen_height','hour','hour12','hour24','minute','second','year','month','date','day_of_week','battery_level','time_format','ampm','touch_x','touch_y','touch_begin_x','touch_begin_y','time','csz','unlocker','weather_temperature','weather_description','weather_id','weather_type','hasweather','hasnotifications','bf','set','qh','noticeDown','YY','appmode1','appmode2','hhhhhhhh','secon','miao','hhhh']);
+
+  const varMatches = [...xml.matchAll(/<Var\s+(?:[^>]*\s+)?name="([^"]+)"/g)];
+  for (const m of varMatches) declaredVars.add(m[1]);
+
+  function isVarDefined(name) {
+    return declaredVars.has(name) || systemVarNames.has(name);
+  }
+
+  // ─── FIX 1: Fix alpha dengan var undefined ───
+  if (document.getElementById('fix-alpha').checked) {
+    const alphaRegex = /alpha="([^"]+)"/g;
+    xml = xml.replace(alphaRegex, (match, expr) => {
+      if (expr === '255' || expr === '0' || !isNaN(expr)) return match;
+      // Cek semua #var di expression
+      const refs = [...expr.matchAll(/#([a-zA-Z_][a-zA-Z0-9_]*)/g)].map(m => m[1]);
+      const undefs = refs.filter(r => !r.includes('.') && !isVarDefined(r));
+      if (undefs.length > 0) {
+        fixCount++;
+        logs.push({ type:'ok', icon:'✅', title:`Fix alpha: <code>${expr}</code> → <code>255</code>`, desc:`Var tidak terdefinisi: ${undefs.map(u=>`<code>#${u}</code>`).join(', ')} → alpha diganti jadi 255 (fully visible)` });
+        return 'alpha="255"';
+      }
+      return match;
+    });
+  }
+
+  // ─── FIX 2: Tambah Unlocker jika tidak ada ───
+  if (document.getElementById('fix-unlocker').checked) {
+    const hasUnlocker = xml.includes('<Unlocker') || xml.includes('name="unlocker"') || xml.includes('command="unlock"');
+    if (!hasUnlocker) {
+      const unlockerBlock = `
+  <!-- [AUTO-ADDED] Unlocker — swipe ke atas min 300px untuk unlock -->
+  <Group name="unlocker">
+    <Button h="#screen_height" w="#screen_width">
+      <Triggers>
+        <Trigger action="up">
+          <ExternCommand command="unlock" condition="ge(#touch_begin_y-#touch_y,300)"/>
+        </Trigger>
+      </Triggers>
+    </Button>
+  </Group>
+`;
+      xml = xml.replace('</Lockscreen>', unlockerBlock + '</Lockscreen>');
+      fixCount++;
+      logs.push({ type:'ok', icon:'✅', title:'Unlocker ditambahkan', desc:'Group unlocker klasik disisipkan sebelum <code>&lt;/Lockscreen&gt;</code>' });
+    } else {
+      // Cek apakah unlocker sudah di posisi terakhir
+      const unlockPos = Math.max(xml.lastIndexOf('<Unlocker'), xml.lastIndexOf('name="unlocker"'));
+      const closePos = xml.lastIndexOf('</Lockscreen>');
+      const between = xml.substring(unlockPos, closePos);
+      const elemAfter = (between.match(/<(Image|Group|Button)\s/g) || []);
+      if (elemAfter.length > 0) {
+        logs.push({ type:'warn', icon:'🟡', title:`Ada ${elemAfter.length} elemen setelah Unlocker`, desc:'Tidak di-auto-fix karena berisiko memindahkan konten penting. Pindahkan Unlocker ke posisi terakhir secara manual.' });
+      }
+    }
+  }
+
+  // ─── FIX 3: Fix srcid tanpa int() ───
+  if (document.getElementById('fix-srcid').checked) {
+    const srcidRegex = /srcid="(#[^"]+)"/g;
+    let srcFixed = 0;
+    xml = xml.replace(srcidRegex, (match, expr) => {
+      // Skip jika sudah ada int() atau ifelse
+      if (expr.includes('int(') || expr.includes('ifelse(') || !expr.includes('#')) return match;
+      // Skip jika expression sederhana tanpa operasi math
+      if (/^#[a-zA-Z_][a-zA-Z0-9_]*$/.test(expr)) return match;
+      srcFixed++;
+      fixCount++;
+      return `srcid="int(${expr})"`;
+    });
+    if (srcFixed > 0) {
+      logs.push({ type:'ok', icon:'✅', title:`Fix srcid: ${srcFixed} expression dibungkus int()`, desc:'Mencegah frame salah atau tidak tampil karena nilai non-integer' });
+    }
+  }
+
+  // ─── FIX 4: Fix #noticeDown di kondisi unlock ───
+  if (document.getElementById('fix-noticedown').checked) {
+    const hasNoticeDown = xml.includes('#noticeDown');
+    const hasNotifBinder = xml.includes('keyguard.notification');
+    if (hasNoticeDown && !hasNotifBinder) {
+      const before = xml;
+      xml = xml.replace(/\*eq\(#noticeDown,0\)/g, '');
+      xml = xml.replace(/eq\(#noticeDown,0\)\*/g, '');
+      if (xml !== before) {
+        fixCount++;
+        logs.push({ type:'ok', icon:'✅', title:'Fix #noticeDown dihapus dari kondisi unlock', desc:'Sistem notifikasi tidak ada di manifest ini, <code>eq(#noticeDown,0)</code> dihapus agar unlock tidak selalu gagal' });
+      }
+    }
+  }
+
+  // ─── FIX 5: Rename var height/width ───
+  if (document.getElementById('fix-sh').checked) {
+    const oldH = document.getElementById('fix-old-h').value.trim();
+    const newH = document.getElementById('fix-new-h').value.trim();
+    const oldW = document.getElementById('fix-old-w').value.trim();
+    const newW = document.getElementById('fix-new-w').value.trim();
+
+    if (oldH && newH && oldH !== newH) {
+      const regH = new RegExp(`#${oldH}\\b`, 'g');
+      const countH = (xml.match(regH) || []).length;
+      if (countH > 0) {
+        xml = xml.replace(regH, `#${newH}`);
+        fixCount++;
+        logs.push({ type:'ok', icon:'✅', title:`Rename #${oldH} → #${newH}`, desc:`${countH} referensi dikonversi` });
+      }
+    }
+    if (oldW && newW && oldW !== newW) {
+      const regW = new RegExp(`#${oldW}\\b`, 'g');
+      const countW = (xml.match(regW) || []).length;
+      if (countW > 0) {
+        xml = xml.replace(regW, `#${newW}`);
+        fixCount++;
+        logs.push({ type:'ok', icon:'✅', title:`Rename #${oldW} → #${newW}`, desc:`${countW} referensi dikonversi` });
+      }
+    }
+  }
+
+  // ─── FIX 6: Bersihkan Command target animasi yang tidak ada ───
+  if (document.getElementById('fix-shan').checked) {
+    // Cari semua Command target="xxx.animation"
+    const cmdRegex = /<Command\s+target="([^"]+)\.animation"[^/]*/g;
+    const namedElements = new Set([...xml.matchAll(/\s+name="([^"]+)"/g)].map(m => m[1]));
+    let cmdFixed = 0;
+    xml = xml.replace(/<Command\s+target="([^"]+)\.animation"\s+value="[^"]+"\s*\/>/g, (match, name) => {
+      if (!namedElements.has(name)) {
+        cmdFixed++;
+        return `<!-- [REMOVED] ${match.trim()} — elemen '${name}' tidak ditemukan -->`;
+      }
+      return match;
+    });
+    if (cmdFixed > 0) {
+      fixCount++;
+      logs.push({ type:'ok', icon:'✅', title:`${cmdFixed} Command animasi orphan dikomentari`, desc:'Command yang target elemen-nya tidak ada di manifest dikomentari agar tidak error' });
+    }
+  }
+
+  // ─── FIX 7: Fix encoding / standalone ───
+  if (document.getElementById('fix-encoding').checked) {
+    const before = xml;
+    xml = xml.replace(/\s+standalone="no"/g, '');
+    xml = xml.replace(/\s+standalone='no'/g, '');
+    if (xml !== before) {
+      fixCount++;
+      logs.push({ type:'ok', icon:'✅', title:'Hapus standalone="no"', desc:'Atribut ini bisa menyebabkan parser MIUI gagal parse XML dari awal' });
+    }
+
+    // Cek encoding UTF-8 vs UTF8
+    if (xml.includes("encoding='UTF8'") || xml.includes('encoding="UTF8"')) {
+      xml = xml.replace(/encoding='UTF8'/g, "encoding='utf-8'").replace(/encoding="UTF8"/g, 'encoding="utf-8"');
+      fixCount++;
+      logs.push({ type:'ok', icon:'✅', title:'Fix encoding UTF8 → utf-8', desc:'Format encoding yang benar adalah lowercase utf-8' });
+    }
+  }
+
+  // ─── Cek sisa issue yang tidak bisa auto-fix ───
+  // Re-parse vars setelah fix
+  const declaredVars2 = new Set();
+  const varMatches2 = [...xml.matchAll(/<Var\s+(?:[^>]*\s+)?name="([^"]+)"/g)];
+  for (const m of varMatches2) declaredVars2.add(m[1]);
+
+  const allRefs2 = [...xml.matchAll(/#([a-zA-Z_][a-zA-Z0-9_]*)/g)].map(m => m[1]);
+  const stillUndef = new Set();
+  for (const ref of allRefs2) {
+    if (!declaredVars2.has(ref) && !systemVarNames.has(ref) && !ref.includes('.')) {
+      stillUndef.add(ref);
+    }
+  }
+  if (stillUndef.size > 0) {
+    const list = [...stillUndef].slice(0,6).map(v => `<code>#${v}</code>`).join(', ');
+    logs.push({ type:'warn', icon:'🟡', title:`${stillUndef.size} var masih tidak terdefinisi (perlu fix manual)`, desc:`${list}${stillUndef.size > 6 ? ` dan ${stillUndef.size-6} lainnya` : ''}. Cek apakah masih dipakai di alpha atau visibility.` });
+  }
+
+  // ─── Output ───
+  document.getElementById('autofix-output').value = xml;
+
+  if (fixCount === 0) {
+    logs.unshift({ type:'info', icon:'ℹ️', title:'Tidak ada yang perlu difix', desc:'Manifest sudah bersih dari issue yang bisa di-auto-fix. Coba cek tab Analyzer untuk detail lebih lanjut.' });
+  } else {
+    logs.unshift({ type:'ok', icon:'🎉', title:`${fixCount} fix berhasil diterapkan`, desc:'Manifest yang sudah difix tersedia di panel kanan. Klik Download untuk menyimpan.' });
+  }
+
+  document.getElementById('fix-log').innerHTML = '<div class="issue-list">' +
+    logs.map(l => `<div class="issue ${l.type}">
+      <span class="issue-icon">${l.icon}</span>
+      <div class="issue-text"><strong>${l.title}</strong><span>${l.desc}</span></div>
+    </div>`).join('') + '</div>';
+
+  toast(`Auto Fix selesai — ${fixCount} perbaikan`);
+}
+
+function copyFixed() {
+  const val = document.getElementById('autofix-output').value;
+  if (!val) { toast('Jalankan Auto Fix dulu!'); return; }
+  navigator.clipboard.writeText(val).then(() => toast('Copied!'));
+}
+
+function downloadFixed() {
+  const val = document.getElementById('autofix-output').value;
+  if (!val) { toast('Jalankan Auto Fix dulu!'); return; }
+  const blob = new Blob([val], { type: 'application/xml' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'manifest_fixed.xml';
+  a.click();
+  toast('manifest_fixed.xml didownload!');
+}
+
+// Init
+initSnippets();
+initReference();
+</script>
+</body>
+</html>
