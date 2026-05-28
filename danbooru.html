@@ -562,8 +562,10 @@ select.ctrl:focus{box-shadow:0 0 0 3px var(--c1h)}
 /* ═══════════════════════════
    STATE & CONSTANTS
 ═══════════════════════════ */
-const DL_KEY   = "db_dl_v2";
-const PREF_KEY = "db_pref_v2";
+const DL_KEY      = "db_dl_v2";
+const DL_IDS_KEY  = "db_dl_ids_v1";
+const DL_MD5S_KEY = "db_dl_md5s_v1";
+const PREF_KEY    = "db_pref_v2";
 
 // S=3cols×7rows=21, M=~5cols×5rows=25, L=~7cols×4rows=28
 const GRID = {
@@ -572,7 +574,9 @@ const GRID = {
   l:{ cls:"size-l", perPage:28 },
 };
 
-let downloadedSet = new Set(JSON.parse(localStorage.getItem(DL_KEY)||"[]"));
+let downloadedSet  = new Set(JSON.parse(localStorage.getItem(DL_KEY)||"[]"));
+let downloadedIds  = new Set(JSON.parse(localStorage.getItem(DL_IDS_KEY)||"[]"));
+let downloadedMd5s = new Set(JSON.parse(localStorage.getItem(DL_MD5S_KEY)||"[]"));
 let prefs = JSON.parse(localStorage.getItem(PREF_KEY)||'{"showSize":true}');
 
 let curPosts   = [];
@@ -588,7 +592,11 @@ let settingsOpen=false;
 /* ═══════════════════════════
    PERSIST
 ═══════════════════════════ */
-function saveDL(){ localStorage.setItem(DL_KEY, JSON.stringify([...downloadedSet])); }
+function saveDL(){
+  localStorage.setItem(DL_KEY,      JSON.stringify([...downloadedSet]));
+  localStorage.setItem(DL_IDS_KEY,  JSON.stringify([...downloadedIds]));
+  localStorage.setItem(DL_MD5S_KEY, JSON.stringify([...downloadedMd5s]));
+}
 function savePref(){ prefs.showSize=document.getElementById("togSize").checked; prefs.hideMeta=document.getElementById("togHideMeta").checked; localStorage.setItem(PREF_KEY,JSON.stringify(prefs)); }
 function loadPrefs(){ document.getElementById("togSize").checked=!!prefs.showSize; document.getElementById("togHideMeta").checked=!!prefs.hideMeta; applyMetaVisibility(); loadTheme(); }
 
@@ -605,6 +613,16 @@ function scls(mb){ return mb>=5?"size-r":mb>=2?"size-y":"size-g"; }
 function rcls(r){ return {g:"r-g",s:"r-s",e:"r-e",q:"r-q"}[r]||"r-q"; }
 function rlbl(r){ return {g:"G",s:"S",e:"E",q:"Q"}[r]||(r||"?").toUpperCase(); }
 function norm(u){ if(!u) return ""; try{const x=new URL(u);x.search="";x.hash="";return x.href;}catch{return u;} }
+function extractMd5FromUrl(u){ if(!u) return ""; const m=u.match(/\/([0-9a-f]{32})\./i); return m?m[1].toLowerCase():""; }
+function isDoneCheck(post){
+  const url=norm(post.file_url||post.large_file_url||"");
+  if(url && downloadedSet.has(url)) return true;
+  if(post.id && downloadedIds.has(String(post.id))) return true;
+  if(post.md5 && downloadedMd5s.has(post.md5.toLowerCase())) return true;
+  const md5=extractMd5FromUrl(url);
+  if(md5 && downloadedMd5s.has(md5)) return true;
+  return false;
+}
 function fmtN(n){ return (n||0)>=1000?((n||0)/1000).toFixed(1)+"k":String(n||0); }
 
 function toast(msg,dur=2500){
@@ -803,7 +821,7 @@ function makeCard(post,idx){
   const card=document.createElement("div");
   card.className="card";
 
-  const isDone=downloadedSet.has(norm(post.file_url||""));
+  const isDone=isDoneCheck(post);
   if(isDone) card.classList.add("done");
 
   const mb=toMB(post.file_size);
@@ -1076,7 +1094,7 @@ function settingsOverlayClick(e){
 }
 /* Keep toggleSettings as alias for toolbar button */
 function toggleSettings(){ openSettings(); }
-function updateStat(){ document.getElementById("settingsStat").innerHTML=`DL tercatat: <b>${downloadedSet.size}</b> URL`; }
+function updateStat(){ document.getElementById("settingsStat").innerHTML=`DL tercatat: <b>${downloadedSet.size}</b> URL · <b>${downloadedIds.size}</b> IDs · <b>${downloadedMd5s.size}</b> MD5s`; }
 
 function exportHistory(){
   const d={app:"Danbooru Fetcher",exported:new Date().toISOString(),count:downloadedSet.size,urls:[...downloadedSet]};
@@ -1094,21 +1112,52 @@ function importHistory(){
     r.onload=ev=>{
       try{
         const p=JSON.parse(ev.target.result);
-        const items=Array.isArray(p)?p:(p.urls||[]);
         let added=0;
-        items.forEach(u=>{ if(!downloadedSet.has(u)){downloadedSet.add(u);added++;} });
+
+        // Format lama (array URL) atau format HTML sendiri
+        const urls=Array.isArray(p)?p:(p.urls||[]);
+        urls.forEach(u=>{
+          const n=norm(u); if(!n) return;
+          if(!downloadedSet.has(n)){downloadedSet.add(n);added++;}
+          // Ekstrak MD5 dari URL dan simpan juga
+          const md5=extractMd5FromUrl(n);
+          if(md5&&!downloadedMd5s.has(md5)) downloadedMd5s.add(md5);
+        });
+
+        // Format Awoobooru v4 — baca md5s
+        (p.md5s||[]).forEach(md5=>{
+          if(!md5||md5.length!==32) return;
+          if(!downloadedMd5s.has(md5)){downloadedMd5s.add(md5);added++;}
+        });
+
+        // Format Awoobooru v4 — baca ids
+        (p.ids||p.post_ids||[]).forEach(id=>{
+          const s=String(id);
+          if(!downloadedIds.has(s)){downloadedIds.add(s);added++;}
+        });
+
         saveDL();
-        document.querySelectorAll("#gallery .card").forEach(c=>{ if(downloadedSet.has(norm(c.dataset.url))) markDone(c,c.dataset.url); });
-        toast(`📥 Import: +${added} URL`); updateStat();
-      }catch{ toast("⚠️ File tidak valid"); }
+
+        // Re-mark kartu yang cocok (URL, ID, atau MD5)
+        document.querySelectorAll("#gallery .card").forEach(c=>{
+          if(c.classList.contains("done")) return;
+          const url=norm(c.dataset.url||"");
+          const id=String(c.dataset.id||"");
+          const md5=extractMd5FromUrl(url);
+          if((url&&downloadedSet.has(url))||(id&&downloadedIds.has(id))||(md5&&downloadedMd5s.has(md5)))
+            _origMarkDone(c,c.dataset.url);
+        });
+
+        toast(`📥 Import: +${added} entri`); updateStat();
+      }catch(err){ toast("⚠️ File tidak valid: "+err.message); }
     };
     r.readAsText(f);
   };
   inp.click();
 }
 function clearHistory(){
-  if(!confirm(`Hapus ${downloadedSet.size} riwayat?`)) return;
-  downloadedSet.clear(); saveDL();
+  if(!confirm(`Hapus ${downloadedSet.size} URL + ${downloadedIds.size} IDs + ${downloadedMd5s.size} MD5s dari riwayat?`)) return;
+  downloadedSet.clear(); downloadedIds.clear(); downloadedMd5s.clear(); saveDL();
   document.querySelectorAll("#gallery .card").forEach(c=>{ c.classList.remove("done"); c.querySelector(".badge-done")?.remove(); });
   updateStat(); toast("🗑️ Riwayat dihapus");
 }
@@ -1524,24 +1573,49 @@ async function gistSyncPull(){
   if(!res.ok) throw new Error(data.message || `GitHub API error (${res.status})`);
 
   const files = data.files || {};
-  const tf    = Object.values(files).find(f => f.filename.startsWith("danbooru_tracker"));
-  if(!tf) throw new Error("File tracker tidak ditemukan di Gist");
+  // Cari file tracker — support format HTML sendiri (danbooru_tracker) dan Awoobooru (awoo_tracker_0)
+  const allFiles = Object.values(files);
+  const tf = allFiles.find(f => f.filename === "danbooru_tracker.json")
+          || allFiles.find(f => f.filename.startsWith("danbooru_tracker"));
+  // File chunk utama Awoobooru
+  const awooChunks = allFiles.filter(f => f.filename.match(/^awoo_tracker_\d+\.json$/));
+  const awooMd5File = allFiles.find(f => f.filename === "awoo_tracker_md5s.json");
 
-  let content = tf.content;
-  if(tf.truncated){
-    const r2 = await fetch(tf.raw_url, { headers: { "Authorization": `token ${gistToken}` } });
-    content   = await r2.text();
+  const before = downloadedSet.size + downloadedIds.size + downloadedMd5s.size;
+
+  // Parse satu file (helper)
+  async function parseTrackerFile(fdata){
+    let content = fdata.content;
+    if(fdata.truncated){
+      const r2 = await fetch(fdata.raw_url, { headers: { "Authorization": `token ${gistToken}` } });
+      content = await r2.text();
+    }
+    const parsed = JSON.parse(content);
+    // URLs
+    const urls = Array.isArray(parsed) ? parsed : (parsed.urls || []);
+    urls.forEach(u => {
+      const n=norm(u); if(!n) return;
+      downloadedSet.add(n);
+      const md5=extractMd5FromUrl(n); if(md5) downloadedMd5s.add(md5);
+    });
+    // IDs (Awoobooru format)
+    (parsed.ids||parsed.post_ids||[]).forEach(id => downloadedIds.add(String(id)));
+    // MD5s (Awoobooru format)
+    (parsed.md5s||[]).forEach(md5 => { if(md5&&md5.length===32) downloadedMd5s.add(md5.toLowerCase()); });
   }
 
-  const parsed = JSON.parse(content);
-  const urls   = Array.isArray(parsed) ? parsed : (parsed.urls || []);
-  const before = downloadedSet.size;
-  urls.forEach(u => downloadedSet.add(u));
+  if(tf) await parseTrackerFile(tf);
+  for(const chunk of awooChunks) await parseTrackerFile(chunk);
+  if(awooMd5File) await parseTrackerFile(awooMd5File);
+
+  if(!tf && awooChunks.length===0 && !awooMd5File)
+    throw new Error("File tracker tidak ditemukan di Gist");
   saveDL();
   reMarkDoneCards();
   updateStat();
   updateSyncStat();
-  return { added: downloadedSet.size - before, total: downloadedSet.size };
+  const after = downloadedSet.size + downloadedIds.size + downloadedMd5s.size;
+  return { added: after - before, total: downloadedSet.size };
 }
 
 /* ═══════════════════════════
@@ -1609,8 +1683,15 @@ async function tgLoad(){
 
   const parsed = JSON.parse(content);
   const urls   = Array.isArray(parsed) ? parsed : (parsed.urls || []);
-  const before = downloadedSet.size;
-  urls.forEach(u => downloadedSet.add(u));
+  const before = downloadedSet.size + downloadedIds.size + downloadedMd5s.size;
+  urls.forEach(u => {
+    const n=norm(u); if(!n) return;
+    downloadedSet.add(n);
+    const md5=extractMd5FromUrl(n); if(md5) downloadedMd5s.add(md5);
+  });
+  // Format Awoobooru v4
+  (parsed.ids||parsed.post_ids||[]).forEach(id => downloadedIds.add(String(id)));
+  (parsed.md5s||[]).forEach(md5 => { if(md5&&md5.length===32) downloadedMd5s.add(md5.toLowerCase()); });
   saveDL();
 
   tgLastFileId = fileId;
@@ -1619,7 +1700,7 @@ async function tgLoad(){
   reMarkDoneCards();
   updateStat();
   updateSyncStat();
-  return { added: downloadedSet.size - before, total: downloadedSet.size };
+  return { added: (downloadedSet.size + downloadedIds.size + downloadedMd5s.size) - before, total: downloadedSet.size };
 }
 
 async function tgFindLatestFileId(){
@@ -1636,7 +1717,7 @@ async function tgFindLatestFileId(){
     if(!msg) continue;
     if(String(msg.chat.id) !== chatIdStr) continue;
     const doc = msg.document;
-    if(doc && doc.file_name && doc.file_name.startsWith("danbooru_tracker_"))
+    if(doc && doc.file_name && (doc.file_name.startsWith("danbooru_tracker_") || doc.file_name.startsWith("awoo_tracker_")))
       return doc.file_id;
   }
   return "";
@@ -1661,10 +1742,13 @@ async function tgTest(){
   return { bot: botName, chatOk: false };
 }
 
-/* ── Helper: re-mark done cards setelah import ── */
 function reMarkDoneCards(){
   document.querySelectorAll("#gallery .card").forEach(c => {
-    if(c.dataset.url && downloadedSet.has(norm(c.dataset.url)) && !c.classList.contains("done"))
+    if(c.classList.contains("done")) return;
+    const url=norm(c.dataset.url||"");
+    const id=String(c.dataset.id||"");
+    const md5=extractMd5FromUrl(url);
+    if((url&&downloadedSet.has(url))||(id&&downloadedIds.has(id))||(md5&&downloadedMd5s.has(md5)))
       _origMarkDone(c, c.dataset.url);
   });
 }
