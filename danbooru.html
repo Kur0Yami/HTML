@@ -1,0 +1,1753 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🌸 Danbooru Fetcher</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  /* ── Theme colors (editable via picker) ── */
+  --c1:#ff8fab;          /* dominant */
+  --c1h:#ffe4ed;         /* dominant light tint */
+  --c1d:#c9566f;         /* dominant dark */
+  --c2:#67e8d6;          /* sub */
+  --c2h:#d0faf5;         /* sub light tint */
+  --c2d:#2bb5a0;         /* sub dark */
+  /* ── Derived (updated by JS) ── */
+  --bdr-c:rgba(255,143,171,.35);
+  --sh-c:rgba(255,100,140,.15);
+  /* ── Fixed tokens ── */
+  --bg:#fff5f8;
+  --surface:#ffffff;
+  --surface2:#fff0f6;
+  --text:#3d2535;
+  --muted:#a87d90;
+  --border:1.5px solid var(--bdr-c);
+  --shadow:0 6px 24px var(--sh-c);
+  --shadow-sm:0 2px 10px var(--sh-c);
+  --card-r:14px;
+  --font-h:'Fredoka One',cursive;
+  --font:'Nunito',sans-serif;
+}
+html{scroll-behavior:smooth}
+body{font-family:var(--font);background:var(--bg);min-height:100vh;color:var(--text);overflow-x:hidden}
+
+/* SHELL */
+.shell{position:relative;z-index:1;max-width:1400px;margin:0 auto;padding:0 10px 80px}
+
+/* HEADER */
+.header{text-align:center;padding:16px 10px 10px}
+.header h1{font-family:var(--font-h);font-size:clamp(1.4rem,4vw,2.4rem);line-height:1}
+.header h1 span{color:var(--c1d);text-shadow:2px 2px 0 var(--c1h)}
+
+/* SEARCH WRAP */
+.search-wrap{background:var(--surface);border:var(--border);border-radius:18px;box-shadow:var(--shadow);padding:12px 14px;margin-bottom:10px}
+.search-row{display:flex;gap:7px;align-items:flex-end;flex-wrap:wrap}
+.tag-wrap{position:relative;flex:1 1 180px}
+.field-label{font-weight:800;font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:3px;display:block}
+#tagInput{width:100%;padding:9px 12px;border:var(--border);border-radius:10px;font-family:var(--font);font-size:14px;font-weight:700;background:var(--surface2);outline:none;transition:box-shadow .15s;color:var(--text)}
+#tagInput:focus{box-shadow:0 0 0 3px var(--c1h);background:var(--surface)}
+
+/* AUTOCOMPLETE — danbooru style */
+.ac-box{
+  position:absolute;top:calc(100% + 3px);left:0;right:0;
+  background:var(--surface);border:1.5px solid var(--c1);
+  border-top:none;border-radius:0 0 12px 12px;
+  z-index:9999;display:none;max-height:320px;overflow-y:auto;
+  box-shadow:var(--shadow);
+}
+.ac-item{display:flex;align-items:center;padding:6px 11px;cursor:pointer;font-size:13px;border-bottom:1px solid #f2f2f2;gap:8px;line-height:1.3}
+.ac-item:last-child{border-bottom:none}
+.ac-item:hover,.ac-item.sel{background:var(--c1h)}
+.ac-name{flex:1;font-weight:400}
+.ac-name b{font-weight:900}
+.ac-count{font-size:11.5px;color:#aaa;font-weight:700;min-width:32px;text-align:right}
+/* category colors (matching danbooru) */
+.cat-0 .ac-name{color:#3a7a00}
+.cat-1 .ac-name{color:#c0392b}
+.cat-3 .ac-name{color:#8e44ad}
+.cat-4 .ac-name{color:#1a6bb5}
+.cat-5 .ac-name{color:#7f8c8d}
+
+/* CONTROLS */
+.ctrl-group{display:flex;flex-direction:column}
+select.ctrl{padding:9px 10px;border:var(--border);border-radius:10px;font-family:var(--font);font-size:13px;font-weight:700;background:var(--surface2);cursor:pointer;min-width:120px;outline:none;color:var(--text)}
+select.ctrl:focus{box-shadow:0 0 0 3px var(--c1h)}
+.btn-search{padding:10px 20px;background:var(--c1);color:#fff;border:none;border-radius:12px;font-family:var(--font-h);font-size:.9rem;cursor:pointer;box-shadow:var(--shadow-sm);transition:transform .1s,box-shadow .1s,background .15s;white-space:nowrap}
+.btn-search:hover{transform:translateY(-2px);box-shadow:0 6px 20px var(--sh-c);background:var(--c1d)}
+.btn-search:active{transform:translateY(0);box-shadow:none}
+
+/* TOOLBAR */
+.toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin-bottom:8px}
+
+/* Grid S/M/L */
+.gs-group{display:flex;border:var(--border);border-radius:12px;overflow:hidden;background:var(--surface);box-shadow:var(--shadow-sm)}
+.gs-btn{padding:6px 13px;background:var(--surface);border:none;border-right:1px solid var(--bdr-c);font-family:var(--font);font-weight:800;font-size:.78rem;cursor:pointer;transition:background .12s;color:var(--text)}
+.gs-btn:last-child{border-right:none}
+.gs-btn.active{background:var(--c1);color:#fff}
+.gs-btn:hover:not(.active){background:var(--c1h)}
+
+/* Adv toggle */
+.adv-toggle{background:var(--surface);border:var(--border);border-radius:12px;padding:6px 11px;font-family:var(--font);font-weight:800;font-size:.75rem;cursor:pointer;box-shadow:var(--shadow-sm);display:flex;align-items:center;gap:5px;color:var(--text)}
+.adv-toggle svg{transition:transform .2s}
+.adv-toggle.open svg{transform:rotate(180deg)}
+
+/* Status chip */
+.status-chip{background:var(--surface);border:var(--border);border-radius:20px;padding:5px 12px;font-weight:800;font-size:.76rem;box-shadow:var(--shadow-sm);color:var(--text)}
+.status-chip span{color:var(--muted);font-weight:600}
+
+/* Buttons */
+.btn-sm{padding:6px 12px;border:none;border-radius:20px;font-family:var(--font);font-weight:800;font-size:.75rem;cursor:pointer;box-shadow:var(--shadow-sm);transition:transform .1s,box-shadow .1s,background .15s;white-space:nowrap}
+.btn-sm:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
+.btn-sm:active{transform:translateY(0);box-shadow:none}
+.btn-lime{background:var(--c1);color:#fff}
+.btn-white{background:var(--surface);color:var(--text);border:var(--border)}
+.btn-ink{background:var(--c2d);color:#fff}
+.btn-danger{background:#f87171;color:#fff}
+
+/* ADV FILTER PANEL */
+.adv-panel{display:none;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:9px;margin-bottom:10px;background:var(--surface);border:var(--border);border-radius:18px;box-shadow:var(--shadow-sm);padding:12px 14px}
+.adv-panel.open{display:grid}
+.adv-field label{font-weight:800;font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:3px;display:block}
+.adv-field input[type=text],.adv-field input[type=number]{width:100%;padding:7px 9px;border:var(--border);border-radius:8px;font-family:var(--font);font-size:13px;font-weight:700;background:var(--surface2);outline:none;color:var(--text)}
+.adv-field input:focus{box-shadow:0 0 0 3px var(--c1h)}
+.toggle-row{display:flex;align-items:center;gap:7px;margin-top:5px}
+.toggle{position:relative;width:36px;height:19px;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0}
+.toggle-track{position:absolute;inset:0;background:#e0d0d8;border:1.5px solid #cbb8c4;border-radius:20px;cursor:pointer;transition:background .2s}
+.toggle input:checked+.toggle-track{background:var(--c1);border-color:var(--c1d)}
+.toggle-thumb{position:absolute;top:2px;left:2px;width:11px;height:11px;background:#fff;border-radius:50%;transition:transform .2s;pointer-events:none;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+.toggle input:checked~.toggle-thumb{transform:translateX(17px)}
+.toggle-label{font-weight:700;font-size:.78rem}
+
+/* GALLERY */
+.gallery{display:grid;gap:8px}
+.gallery.size-s{grid-template-columns:repeat(3,1fr)}
+.gallery.size-m{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+.gallery.size-l{grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}
+
+/* CARD */
+.card{background:var(--surface);border:var(--border);border-radius:var(--card-r);box-shadow:var(--shadow-sm);overflow:hidden;position:relative;cursor:pointer;transition:transform .15s,box-shadow .15s}
+.card:hover{transform:translateY(-4px) scale(1.01);box-shadow:0 10px 28px var(--sh-c)}
+.card.done{outline:3px solid #4ade80;outline-offset:-1px}
+
+/* Thumb */
+.card-thumb{position:relative;aspect-ratio:1/1;overflow:hidden;background:var(--c1h)}
+.card-thumb img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .3s}
+.card:hover .card-thumb img{transform:scale(1.06)}
+
+/* ALWAYS-VISIBLE DOWNLOAD BTN */
+.thumb-dl{
+  position:absolute;bottom:4px;right:4px;z-index:15;
+  width:26px;height:26px;border-radius:50%;
+  background:rgba(0,0,0,.7);border:1.5px solid rgba(255,255,255,.4);
+  display:flex;align-items:center;justify-content:center;
+  font-size:12px;cursor:pointer;
+  transition:background .15s,transform .12s;
+  color:#fff;user-select:none;
+}
+.thumb-dl:hover{background:var(--c1);border-color:var(--c1d);color:#fff;transform:scale(1.15)}
+
+/* Checkbox */
+.card-cb{position:absolute;top:4px;left:4px;z-index:15;width:15px;height:15px;cursor:pointer;accent-color:var(--c1)}
+
+/* Badges */
+.badge{position:absolute;z-index:10;pointer-events:none;font-size:9.5px;font-weight:800;padding:2px 6px;border-radius:20px;border:none;line-height:1.4;box-shadow:0 1px 4px rgba(0,0,0,.2)}
+.badge-top{top:4px;right:4px;background:rgba(255,255,255,.9);color:var(--text)}
+.badge-size{bottom:4px;left:4px}
+.badge-done{bottom:4px;left:4px;background:#4ade80;color:#fff}
+.size-g{background:#4ade80;color:#fff}
+.size-y{background:#facc15;color:#111}
+.size-r{background:#f87171;color:#fff}
+.badge-rating{position:absolute;top:4px;left:22px;z-index:10;pointer-events:none;font-size:8.5px;font-weight:900;padding:2px 6px;border-radius:20px;border:none;text-transform:uppercase;box-shadow:0 1px 4px rgba(0,0,0,.2)}
+.r-g{background:#4ade80;color:#fff}.r-s{background:#facc15;color:#111}.r-e{background:#f87171;color:#fff}.r-q{background:#fb923c;color:#fff}
+
+/* Card footer */
+.card-foot{padding:5px 6px 6px;border-top:1px solid var(--bdr-c)}
+.cf-id{font-size:8.5px;font-weight:800;color:var(--muted);text-transform:uppercase;opacity:.6}
+.cf-meta{font-size:9.5px;font-weight:800;color:var(--text);margin-top:1px}
+
+/* PAGINATION */
+.pagination{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:14px;flex-wrap:wrap}
+.pg-btn{width:36px;height:36px;border:var(--border);border-radius:50%;background:var(--surface);font-size:1.15rem;cursor:pointer;box-shadow:var(--shadow-sm);display:flex;align-items:center;justify-content:center;font-family:var(--font-h);transition:transform .1s,background .12s}
+.pg-btn:hover:not(:disabled){transform:translateY(-2px);background:var(--c1);color:#fff}
+.pg-btn:disabled{opacity:.3;cursor:not-allowed;transform:none!important}
+.pg-info{background:var(--surface);border:var(--border);border-radius:20px;padding:6px 16px;font-family:var(--font-h);font-size:.88rem;box-shadow:var(--shadow-sm);color:var(--text)}
+
+/* SKELETON */
+.skeleton{animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.5}50%{opacity:1}}
+.sk-thumb{background:var(--c1h);aspect-ratio:1/1}
+.sk-line{background:var(--c2h);border-radius:4px;height:8px;margin:6px 7px}
+
+/* PLACEHOLDER */
+.placeholder{grid-column:1/-1;text-align:center;padding:40px 20px}
+.ph-icon{font-size:2.4rem;margin-bottom:9px}
+.placeholder h3{font-family:var(--font-h);font-size:1.1rem;color:var(--text)}
+.placeholder p{color:var(--muted);font-size:.82rem;margin-top:4px}
+
+/* LIGHTBOX */
+.lb{position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9000;display:none;flex-direction:column;align-items:center;justify-content:center;padding:14px}
+.lb.open{display:flex}
+.lb-close{position:absolute;top:12px;right:16px;color:#fff;cursor:pointer;background:rgba(255,255,255,.15);border:none;border-radius:50%;width:34px;height:34px;font-size:1rem;display:flex;align-items:center;justify-content:center}
+.lb-close:hover{background:rgba(255,255,255,.3)}
+.lb-img-wrap{position:relative;max-width:90vw;max-height:70vh}
+.lb-img-wrap img{max-width:90vw;max-height:70vh;object-fit:contain;border:2px solid #fff;border-radius:9px;display:block}
+.lb-nav{position:absolute;top:50%;transform:translateY(-50%);background:rgba(0,0,0,.55);border:none;color:#fff;border-radius:50%;width:38px;height:38px;font-size:1.3rem;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.lb-nav.prev{left:-50px}.lb-nav.next{right:-50px}
+.lb-nav:hover{background:var(--c1);color:#fff}
+.lb-info{text-align:center;color:#fff;margin-top:10px}
+.lb-info h3{font-family:var(--font-h);font-size:.95rem}
+.lb-info p{font-size:.72rem;color:#ccc;margin-top:2px}
+.lb-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:7px;max-width:640px;justify-content:center;max-height:65px;overflow-y:auto}
+.lb-tag{background:rgba(255,255,255,.15);color:#fff;font-size:10.5px;padding:2px 8px;border-radius:20px;cursor:pointer;border:none;font-family:var(--font);font-weight:700}
+.lb-tag:hover{background:var(--c1);color:#fff}
+.lb-acts{display:flex;gap:7px;margin-top:9px;flex-wrap:wrap;justify-content:center}
+
+/* TOAST */
+#toast-ct{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none}
+.toast{background:var(--c1d);color:#fff;padding:8px 18px;border-radius:30px;font-family:var(--font);font-weight:800;font-size:.82rem;box-shadow:0 4px 16px var(--sh-c);animation:tIn .25s ease,tOut .25s ease 2.3s forwards}
+@keyframes tIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+@keyframes tOut{to{opacity:0;transform:translateY(-8px)}}
+
+/* FAB */
+.fab{display:none}
+/* Settings overlay — same pattern as chars-overlay (proven to work on mobile) */
+.settings-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:8400;display:none;align-items:flex-end;justify-content:center;padding:0}
+.settings-overlay.open{display:flex}
+.settings-sheet{background:var(--surface);border:var(--border);border-top:3px solid var(--c1);border-radius:22px 22px 0 0;box-shadow:0 -8px 32px var(--sh-c);width:100%;max-width:600px;padding:18px 16px 32px;display:flex;flex-direction:column;gap:9px;max-height:88vh;overflow-y:auto}
+.sync-label{font-weight:800;font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:2px;display:block}
+.sync-input{width:100%;padding:7px 10px;border:var(--border);border-radius:9px;font-family:var(--font);font-size:12px;font-weight:700;background:var(--surface2);outline:none;color:var(--text);box-sizing:border-box}
+.sync-input:focus{box-shadow:0 0 0 3px var(--c1h)}
+.sync-row{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.sync-stat{font-size:.72rem;font-weight:600;color:var(--muted);background:var(--surface2);border-radius:9px;padding:6px 9px;line-height:1.65}
+.sync-stat b{color:var(--text)}
+.settings-title{font-family:var(--font-h);font-size:.9rem;border-bottom:1.5px dashed var(--bdr-c);padding-bottom:6px;color:var(--text)}
+.settings-stat{font-size:.76rem;color:var(--muted);font-weight:600;background:var(--surface2);border-radius:10px;padding:7px 9px;line-height:1.7}
+.settings-stat b{color:var(--text)}
+
+/* ── CHARS MODAL ──────────────────── */
+.chars-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:8500;display:none;align-items:flex-end;justify-content:center;padding:0}
+.chars-overlay.open{display:flex}
+.chars-sheet{background:var(--surface);border:var(--border);border-top:3px solid var(--c1);border-radius:22px 22px 0 0;box-shadow:0 -8px 32px var(--sh-c);width:100%;max-width:600px;padding:18px 16px 28px;display:flex;flex-direction:column;gap:11px;max-height:85vh;overflow-y:auto}
+.chars-header{display:flex;align-items:center;justify-content:space-between}
+.chars-title{font-family:var(--font-h);font-size:1.1rem;color:var(--text)}
+.chars-close{background:none;border:none;font-size:1.3rem;cursor:pointer;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center}
+.chars-close:hover{background:var(--c1h)}
+.chars-input-row{display:flex;gap:7px}
+.chars-input{flex:1;padding:9px 12px;border:var(--border);border-radius:10px;font-family:var(--font);font-size:14px;font-weight:700;background:var(--surface2);outline:none;color:var(--text)}
+.chars-input:focus{box-shadow:0 0 0 3px var(--c1h);background:var(--surface)}
+.chars-btn{padding:9px 16px;background:var(--c1);color:#fff;border:none;border-radius:12px;font-family:var(--font-h);font-size:.85rem;cursor:pointer;white-space:nowrap;box-shadow:var(--shadow-sm);transition:background .15s}
+.chars-btn:hover{background:var(--c1d)}.chars-btn:active{transform:translateY(1px);box-shadow:none}
+.chars-opts{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.chars-result-box{background:var(--surface2);border:var(--border);border-radius:12px;padding:10px 12px;font-size:12px;font-family:monospace;word-break:break-all;line-height:1.6;min-height:48px;color:var(--text);max-height:200px;overflow-y:auto}
+.chars-result-box.empty{color:var(--muted);font-style:italic;font-family:var(--font)}
+.chars-actions{display:flex;gap:7px;flex-wrap:wrap}
+.chars-stat{font-size:.75rem;font-weight:800;color:var(--muted)}
+.chars-spinner{display:none;font-size:.8rem;color:var(--c1d);font-weight:700;text-align:center;padding:8px}
+.chars-spinner.show{display:block}
+
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--c1);border-radius:10px;opacity:.6}
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- HEADER -->
+  <header class="header">
+    <h1>Danbooru <span>Fetcher</span></h1>
+  </header>
+
+  <!-- SEARCH -->
+  <div class="search-wrap">
+    <div class="search-row">
+      <div class="tag-wrap">
+        <label class="field-label" for="tagInput">🏷️ Tags (spasi=AND, -=exclude)</label>
+        <input type="text" id="tagInput" placeholder="arknights 1girl …" autocomplete="off" value="wuthering_waves">
+        <div class="ac-box" id="acBox"></div>
+      </div>
+
+      <div class="ctrl-group">
+        <label class="field-label">📊 Urut</label>
+        <select id="orderInput" class="ctrl">
+          <option value="">Terbaru</option>
+          <option value="order:score">⭐ Score</option>
+          <option value="order:favcount">♡ Favorit</option>
+          <option value="order:rank">🔥 Trending</option>
+          <option value="order:views">👁 Views</option>
+        </select>
+      </div>
+
+      <div class="ctrl-group">
+        <label class="field-label">🔞 Rating</label>
+        <select id="ratingInput" class="ctrl">
+          <option value="rating:general">General ✅</option>
+          <option value="rating:sensitive">Sensitive 🟡</option>
+          <option value="rating:questionable">Questionable 🟠</option>
+          <option value="rating:explicit">Explicit 🔴</option>
+          <option value="">Semua</option>
+        </select>
+      </div>
+
+      <button class="btn-search" onclick="startSearch()">🔍 Cari</button>
+    </div>
+  </div>
+
+  <!-- TOOLBAR -->
+  <div class="toolbar">
+    <div class="gs-group">
+      <button class="gs-btn active" id="gs-s" onclick="setGrid('s')">S</button>
+      <button class="gs-btn"        id="gs-m" onclick="setGrid('m')">M</button>
+      <button class="gs-btn"        id="gs-l" onclick="setGrid('l')">L</button>
+    </div>
+    <button class="adv-toggle" id="advToggle" onclick="toggleAdv()">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+      Filter
+    </button>
+    <button class="btn-sm btn-white" onclick="openChars()" style="gap:4px">🎴 Chars</button>
+    <button class="btn-sm btn-white" onclick="toggleSettings()" id="toolbarSettingsBtn" style="gap:4px">⚙️ Settings</button>
+    <div class="status-chip" id="statusChip" style="display:none">—</div>
+    <button class="btn-sm btn-lime"  id="btnSelAll"  style="display:none" onclick="selectAll()">☑ Semua</button>
+    <button class="btn-sm btn-white" id="btnDesel"   style="display:none" onclick="deselectAll()">☐ Batal</button>
+    <button class="btn-sm btn-ink"   id="btnDlSel"   style="display:none" onclick="downloadSelected()">⬇️ DL Dipilih</button>
+  </div>
+
+  <!-- ADVANCED FILTER -->
+  <div class="adv-panel" id="advPanel">
+    <div class="adv-field">
+      <label>🏷️ Tag Filter (must, -excl, ~atau)</label>
+      <input type="text" id="tagFilterInput" placeholder="-nsfw ~solo">
+    </div>
+    <div class="adv-field">
+      <label>📏 Ukuran Min (MB)</label>
+      <input type="number" id="sizeMin" value="0" min="0" step="0.5">
+    </div>
+    <div class="adv-field">
+      <label>📏 Ukuran Maks (MB)</label>
+      <input type="number" id="sizeMax" value="9999" min="0" step="0.5">
+    </div>
+    <div class="adv-field">
+      <label>⚙️ Opsi</label>
+      <div class="toggle-row">
+        <label class="toggle"><input type="checkbox" id="togSize" checked onchange="savePref()"><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+        <span class="toggle-label">Tampilkan ukuran file</span>
+      </div>
+      <div class="toggle-row" style="margin-top:7px">
+        <label class="toggle"><input type="checkbox" id="togHideMeta" onchange="applyMetaVisibility();savePref()"><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+        <span class="toggle-label">Sembunyikan #ID & resolusi</span>
+      </div>
+      <div class="toggle-row" style="margin-top:7px">
+        <label class="toggle"><input type="checkbox" id="togHideDone" onchange="applyFilter()"><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+        <span class="toggle-label">Sembunyikan yg sudah DL</span>
+      </div>
+      <div style="margin-top:8px">
+        <button class="btn-sm btn-lime" style="width:100%" onclick="applyFilter()">✅ Terapkan Filter</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- GALLERY -->
+  <div class="gallery size-s" id="gallery">
+    <div class="placeholder">
+      <div class="ph-icon">🌸</div>
+      <h3>Siap mencari!</h3>
+      <p>Masukkan tag lalu klik Cari.</p>
+    </div>
+  </div>
+
+  <!-- PAGINATION -->
+  <div class="pagination" id="pagination" style="display:none">
+    <button class="pg-btn" id="pgPrev" onclick="goPage(currentPage-1)">‹</button>
+    <div class="pg-info" id="pgInfo">Hal. 1</div>
+    <button class="pg-btn" id="pgNext" onclick="goPage(currentPage+1)">›</button>
+  </div>
+
+</div>
+
+<!-- LIGHTBOX -->
+<div class="lb" id="lb" onclick="lbBgClick(event)">
+  <button class="lb-close" onclick="closeLb()">✕</button>
+  <div class="lb-img-wrap">
+    <img id="lbImg" src="" alt="">
+    <button class="lb-nav prev" onclick="lbNav(-1);event.stopPropagation()">‹</button>
+    <button class="lb-nav next" onclick="lbNav(+1);event.stopPropagation()">›</button>
+  </div>
+  <div class="lb-info">
+    <h3 id="lbTitle"></h3>
+    <p id="lbMeta"></p>
+    <div class="lb-tags" id="lbTags"></div>
+    <div class="lb-acts">
+      <button class="btn-sm btn-lime"  onclick="lbDl()">⬇️ Unduh</button>
+      <button class="btn-sm btn-white" onclick="lbOpen()">🔗 Danbooru</button>
+      <button class="btn-sm btn-white" onclick="closeLb()">✕ Tutup</button>
+    </div>
+  </div>
+</div>
+
+<!-- CHARS MODAL -->
+<div class="chars-overlay" id="charsOverlay" onclick="charsOverlayClick(event)">
+  <div class="chars-sheet" id="charsSheet">
+    <div class="chars-header">
+      <span class="chars-title">🎴 Character List Fetcher</span>
+      <button class="chars-close" onclick="closeChars()">✕</button>
+    </div>
+
+    <div class="chars-input-row">
+      <input class="chars-input" id="charsFranchise" placeholder="Nama franchise, cth: arknights" autocomplete="off"
+        onkeydown="if(event.key==='Enter') fetchChars()">
+      <input class="chars-input" id="charsLimit" type="number" value="50" min="1" max="200" style="max-width:70px" title="Maks karakter">
+      <button class="chars-btn" onclick="fetchChars()">Fetch</button>
+    </div>
+
+    <div class="chars-opts">
+      <label style="display:flex;align-items:center;gap:5px;font-weight:800;font-size:.78rem;cursor:pointer">
+        <label class="toggle"><input type="checkbox" id="charsDedup" checked><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+        Dedup variant
+      </label>
+      <label style="display:flex;align-items:center;gap:5px;font-weight:800;font-size:.78rem;cursor:pointer">
+        <label class="toggle"><input type="checkbox" id="charsFemale"><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+        👧 Female only
+      </label>
+      <label style="display:flex;align-items:center;gap:5px;font-weight:800;font-size:.78rem;cursor:pointer">
+        <label class="toggle"><input type="checkbox" id="charsSetTag"><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+        Set ke Search
+      </label>
+    </div>
+
+    <div class="chars-spinner" id="charsSpinner">⏳ Fetching dari Danbooru…</div>
+
+    <div class="chars-result-box empty" id="charsResult">Hasil akan muncul di sini…</div>
+    <div class="chars-stat" id="charsStat"></div>
+    <details id="charsVariantDetail" style="display:none">
+      <summary style="font-weight:800;font-size:.76rem;cursor:pointer;color:#888;margin-top:2px">📦 Lihat variant yang digabung</summary>
+      <div id="charsVariantList" style="font-size:.74rem;color:#555;line-height:1.9;margin-top:6px;max-height:140px;overflow-y:auto;padding:4px 0"></div>
+    </details>
+    <details id="charsVariantDetail" style="display:none">
+      <summary style="font-weight:800;font-size:.76rem;cursor:pointer;color:#888;margin-top:2px">📦 Lihat variant yang digabung</summary>
+      <div id="charsVariantList" style="font-size:.74rem;color:#666;line-height:1.9;margin-top:6px;max-height:140px;overflow-y:auto"></div>
+    </details>
+
+    <div class="chars-actions">
+      <button class="btn-sm btn-lime"  onclick="charsCopy()" id="btnCharsCopy" style="display:none">📋 Copy</button>
+      <button class="btn-sm btn-white" onclick="charsExport()" id="btnCharsExport" style="display:none">💾 Simpan .txt</button>
+      <button class="btn-sm btn-ink"   onclick="charsCopySorter()" id="btnCharsSorter" style="display:none">📋 Sorter format</button>
+      <button class="btn-sm btn-white" onclick="charsClear()">🗑 Clear</button>
+    </div>
+
+    <!-- Search franchise helper -->
+    <details style="margin-top:4px">
+      <summary style="font-weight:800;font-size:.76rem;cursor:pointer;color:#888">🔍 Cari nama franchise di Danbooru</summary>
+      <div style="display:flex;gap:6px;margin-top:7px">
+        <input class="chars-input" id="charsSearch" placeholder="keyword franchise…" onkeydown="if(event.key==='Enter') searchFranchise()">
+        <button class="chars-btn" onclick="searchFranchise()">Cari</button>
+      </div>
+      <div id="charsSearchResult" style="font-size:.78rem;margin-top:7px;color:#555;line-height:1.8"></div>
+    </details>
+  </div>
+</div>
+
+<div id="toast-ct"></div>
+
+<!-- Settings bottom sheet overlay -->
+<div class="settings-overlay" id="settingsOverlay" onclick="settingsOverlayClick(event)">
+  <div class="settings-sheet" id="settingsSheet">
+    <div class="chars-header">
+      <span class="chars-title">⚙️ Settings</span>
+      <button class="chars-close" onclick="closeSettings()">✕</button>
+    </div>
+
+  <div class="settings-title">⚙️ Settings</div>
+
+  <!-- Theme Picker -->
+  <div style="display:flex;flex-direction:column;gap:6px">
+    <div style="font-weight:800;font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">🎨 Tema Warna</div>
+    <div style="display:flex;gap:6px;align-items:center">
+      <div style="flex:1">
+        <div style="font-size:.68rem;font-weight:800;color:var(--muted);margin-bottom:3px">Dominan</div>
+        <input type="color" id="colorC1" value="#ff8fab"
+          oninput="applyTheme(this.value, document.getElementById('colorC2').value)"
+          style="width:100%;height:32px;border:var(--border);border-radius:8px;cursor:pointer;padding:2px;background:var(--surface2)">
+      </div>
+      <div style="flex:1">
+        <div style="font-size:.68rem;font-weight:800;color:var(--muted);margin-bottom:3px">Sub</div>
+        <input type="color" id="colorC2" value="#67e8d6"
+          oninput="applyTheme(document.getElementById('colorC1').value, this.value)"
+          style="width:100%;height:32px;border:var(--border);border-radius:8px;cursor:pointer;padding:2px;background:var(--surface2)">
+      </div>
+    </div>
+    <!-- Preset palettes -->
+    <div style="display:flex;gap:5px;flex-wrap:wrap">
+      <button class="btn-sm" onclick="setTheme('#ff8fab','#67e8d6')" title="🌸 Pink+Mint"
+        style="background:linear-gradient(135deg,#ff8fab,#67e8d6);color:#fff;border:none;padding:5px 10px;font-size:.7rem">🌸</button>
+      <button class="btn-sm" onclick="setTheme('#b39ddb','#ffe082')" title="💜 Lavender+Yellow"
+        style="background:linear-gradient(135deg,#b39ddb,#ffe082);color:#fff;border:none;padding:5px 10px;font-size:.7rem">💜</button>
+      <button class="btn-sm" onclick="setTheme('#81d4fa','#ff8a65')" title="🩵 Sky+Coral"
+        style="background:linear-gradient(135deg,#81d4fa,#ff8a65);color:#fff;border:none;padding:5px 10px;font-size:.7rem">🩵</button>
+      <button class="btn-sm" onclick="setTheme('#a5d6a7','#ffcc80')" title="🌿 Sage+Peach"
+        style="background:linear-gradient(135deg,#a5d6a7,#ffcc80);color:#fff;border:none;padding:5px 10px;font-size:.7rem">🌿</button>
+      <button class="btn-sm" onclick="setTheme('#f48fb1','#f48fb1')" title="🩷 Mono Pink"
+        style="background:linear-gradient(135deg,#f48fb1,#ce93d8);color:#fff;border:none;padding:5px 10px;font-size:.7rem">🩷</button>
+      <button class="btn-sm" onclick="setTheme('#7e57c2','#4dd0e1')" title="🔮 Dusk"
+        style="background:linear-gradient(135deg,#7e57c2,#4dd0e1);color:#fff;border:none;padding:5px 10px;font-size:.7rem">🔮</button>
+    </div>
+  </div>
+  <div style="height:1px;background:var(--bdr-c)"></div>
+
+  <div class="settings-stat" id="gmStat">—</div>
+  <button class="btn-sm btn-ink" onclick="installBridge()" style="width:100%" id="btnInstallBridge">📦 Install GM Bridge</button>
+  <div style="height:1px;background:var(--bdr-c)"></div>
+  <div class="settings-title" style="font-size:.78rem">Riwayat Download</div>
+  <div class="settings-stat" id="settingsStat">—</div>
+  <button class="btn-sm btn-lime"   onclick="exportHistory()" style="width:100%">📤 Export JSON</button>
+  <button class="btn-sm btn-white"  onclick="importHistory()" style="width:100%">📥 Import JSON</button>
+  <button class="btn-sm btn-danger" onclick="clearHistory()"  style="width:100%">🗑️ Hapus Riwayat</button>
+
+  <div style="height:1px;background:var(--bdr-c)"></div>
+
+  <!-- GIST SYNC -->
+  <div class="settings-title">&#9729;&#65039; Gist Sync</div>
+  <div>
+    <label class="sync-label">GitHub Token</label>
+    <input id="gistTokenInput" class="sync-input" type="password" placeholder="ghp_xxxxxxxxxxxx"
+      oninput="gistToken=this.value.trim();localStorage.setItem('db_gist_token',gistToken)">
+  </div>
+  <div>
+    <label class="sync-label">Gist ID <span style="font-weight:600;text-transform:none">(kosong = buat otomatis)</span></label>
+    <input id="gistIdInput" class="sync-input" type="text" placeholder="auto-create jika kosong"
+      oninput="gistId=this.value.trim();localStorage.setItem('db_gist_id',gistId)">
+  </div>
+  <div class="sync-stat" id="gistStat">Belum tersync ke Gist</div>
+  <div class="sync-row">
+    <button class="btn-sm btn-ink"   id="btnGistPush" onclick="uiGistPush()">&#9729;&#65039; Push &rarr;</button>
+    <button class="btn-sm btn-white" id="btnGistPull" onclick="uiGistPull()">&#8681; Pull &larr;</button>
+  </div>
+
+  <div style="height:1px;background:var(--bdr-c)"></div>
+
+  <!-- TELEGRAM SYNC -->
+  <div class="settings-title">&#9992;&#65039; Telegram Sync</div>
+  <div style="font-size:.7rem;color:var(--muted);line-height:1.55;background:var(--surface2);border-radius:9px;padding:7px 9px">
+    &#128161; Buat bot via @BotFather &rarr; isi token.<br>
+    Kirim /start ke bot &rarr; buka getUpdates &rarr; catat <code>chat.id</code>.
+  </div>
+  <div>
+    <label class="sync-label">Bot Token</label>
+    <input id="tgTokenInput" class="sync-input" type="password" placeholder="123456:ABC..."
+      oninput="tgBotToken=this.value.trim();localStorage.setItem('db_tg_token',tgBotToken)">
+  </div>
+  <div>
+    <label class="sync-label">Chat ID</label>
+    <input id="tgChatInput" class="sync-input" type="text" placeholder="-100xxx atau @username"
+      oninput="tgChatId=this.value.trim();localStorage.setItem('db_tg_chat_id',tgChatId)">
+  </div>
+  <div class="sync-stat" id="tgStat">Belum tersync ke Telegram</div>
+  <div class="sync-row">
+    <button class="btn-sm btn-ink"   id="btnTgPush" onclick="uiTgPush()" style="background:#229ED9">&#9992;&#65039; Sync &rarr;</button>
+    <button class="btn-sm btn-white" id="btnTgPull" onclick="uiTgPull()">&#128233; Load &larr;</button>
+  </div>
+  <button class="btn-sm btn-white" id="btnTgTest" onclick="uiTgTest()" style="width:100%">&#128269; Test Koneksi</button>
+  <div class="toggle-row">
+    <label class="toggle"><input type="checkbox" id="togAutoTg" onchange="autoSyncTg=this.checked;localStorage.setItem('db_auto_sync_tg',autoSyncTg)"><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+    <span class="toggle-label" style="font-size:.75rem">Auto sync TG setiap download</span>
+  </div>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════
+   STATE & CONSTANTS
+═══════════════════════════ */
+const DL_KEY   = "db_dl_v2";
+const PREF_KEY = "db_pref_v2";
+
+// S=3cols×7rows=21, M=~5cols×5rows=25, L=~7cols×4rows=28
+const GRID = {
+  s:{ cls:"size-s", perPage:21 },
+  m:{ cls:"size-m", perPage:25 },
+  l:{ cls:"size-l", perPage:28 },
+};
+
+let downloadedSet = new Set(JSON.parse(localStorage.getItem(DL_KEY)||"[]"));
+let prefs = JSON.parse(localStorage.getItem(PREF_KEY)||'{"showSize":true}');
+
+let curPosts   = [];
+let currentPage = 1;
+let curGrid    = "s";
+let hasNext    = false;
+let lbIdx      = 0;
+let acTimer    = null;
+let acData     = [];
+let acSel      = -1;
+let settingsOpen=false;
+
+/* ═══════════════════════════
+   PERSIST
+═══════════════════════════ */
+function saveDL(){ localStorage.setItem(DL_KEY, JSON.stringify([...downloadedSet])); }
+function savePref(){ prefs.showSize=document.getElementById("togSize").checked; prefs.hideMeta=document.getElementById("togHideMeta").checked; localStorage.setItem(PREF_KEY,JSON.stringify(prefs)); }
+function loadPrefs(){ document.getElementById("togSize").checked=!!prefs.showSize; document.getElementById("togHideMeta").checked=!!prefs.hideMeta; applyMetaVisibility(); loadTheme(); }
+
+/* ═══════════════════════════
+   UTILS
+═══════════════════════════ */
+function fmtBytes(b){
+  if(!b) return null;
+  if(b<1048576) return (b/1024).toFixed(1)+" KB";
+  return (b/1048576).toFixed(2)+" MB";
+}
+function toMB(b){ return (b||0)/1048576; }
+function scls(mb){ return mb>=5?"size-r":mb>=2?"size-y":"size-g"; }
+function rcls(r){ return {g:"r-g",s:"r-s",e:"r-e",q:"r-q"}[r]||"r-q"; }
+function rlbl(r){ return {g:"G",s:"S",e:"E",q:"Q"}[r]||(r||"?").toUpperCase(); }
+function norm(u){ if(!u) return ""; try{const x=new URL(u);x.search="";x.hash="";return x.href;}catch{return u;} }
+function fmtN(n){ return (n||0)>=1000?((n||0)/1000).toFixed(1)+"k":String(n||0); }
+
+function toast(msg,dur=2500){
+  const c=document.getElementById("toast-ct"),t=document.createElement("div");
+  t.className="toast"; t.textContent=msg; c.appendChild(t);
+  setTimeout(()=>t.remove(),dur+300);
+}
+
+/* ═══════════════════════════
+   GRID SIZE
+═══════════════════════════ */
+function setGrid(size){
+  curGrid=size;
+  const g=document.getElementById("gallery");
+  Object.keys(GRID).forEach(k=>{
+    g.classList.remove(GRID[k].cls);
+    document.getElementById("gs-"+k).classList.toggle("active",k===size);
+  });
+  g.classList.add(GRID[size].cls);
+}
+
+/* ═══════════════════════════
+   AUTOCOMPLETE
+═══════════════════════════ */
+const tagEl = document.getElementById("tagInput");
+const acBox = document.getElementById("acBox");
+
+tagEl.addEventListener("input",()=>{
+  clearTimeout(acTimer);
+  const last = getLastWord().replace(/^[-~]/,"");
+  if(last.length<1){ closeAc(); return; }
+  acTimer=setTimeout(()=>fetchAc(last),200);
+});
+
+tagEl.addEventListener("keydown",e=>{
+  const items=acBox.querySelectorAll(".ac-item");
+  if(e.key==="ArrowDown"){ acSel=Math.min(acSel+1,items.length-1); hiAc(items); e.preventDefault(); }
+  else if(e.key==="ArrowUp"){ acSel=Math.max(acSel-1,0); hiAc(items); e.preventDefault(); }
+  else if(e.key==="Enter"){
+    if(acSel>=0&&items[acSel]){ applyAcItem(acData[acSel]); e.preventDefault(); }
+    else{ startSearch(); closeAc(); e.preventDefault(); }
+  }
+  else if(e.key==="Escape") closeAc();
+});
+document.addEventListener("click",e=>{ if(!acBox.contains(e.target)&&e.target!==tagEl) closeAc(); });
+
+function getLastWord(){ const w=tagEl.value.split(/\s+/); return w[w.length-1]; }
+
+async function fetchAc(q){
+  try{
+    const r=await fetch(`https://danbooru.donmai.us/tags/autocomplete.json?search[name_matches]=${encodeURIComponent(q)}*&limit=20&only=name,post_count,category`);
+    if(!r.ok) return;
+    acData=await r.json();
+    renderAc(acData,q);
+  }catch{}
+}
+
+function renderAc(data,query){
+  if(!data.length){ closeAc(); return; }
+  acBox.innerHTML=""; acSel=-1;
+  data.forEach((t,i)=>{
+    const el=document.createElement("div");
+    el.className=`ac-item cat-${t.category}`;
+    // Highlight matched portion bold
+    const name=t.name||"", q=(query||"").toLowerCase();
+    const idx=name.toLowerCase().indexOf(q);
+    let dn=name;
+    if(idx>=0) dn=name.slice(0,idx)+`<b>${name.slice(idx,idx+q.length)}</b>`+name.slice(idx+q.length);
+    el.innerHTML=`<span class="ac-name">${dn}</span><span class="ac-count">${fmtN(t.post_count)}</span>`;
+    el.onmouseenter=()=>{ acSel=i; hiAc(acBox.querySelectorAll(".ac-item")); };
+    el.onclick=()=>applyAcItem(t);
+    acBox.appendChild(el);
+  });
+  acBox.style.display="block";
+}
+
+function hiAc(items){ items.forEach((el,i)=>el.classList.toggle("sel",i===acSel)); }
+
+function applyAcItem(t){
+  const raw=tagEl.value, words=raw.split(/\s+/);
+  const lastRaw=words[words.length-1];
+  const prefix=lastRaw.match(/^[-~]/)?.[0]||"";
+  words[words.length-1]=prefix+t.name;
+  tagEl.value=words.join(" ")+" ";
+  closeAc(); tagEl.focus();
+}
+function closeAc(){ acBox.style.display="none"; acSel=-1; }
+
+/* ═══════════════════════════
+   BUILD TAGS
+═══════════════════════════ */
+function buildTags(){
+  const tag=tagEl.value.trim();
+  const order=document.getElementById("orderInput").value;
+  const rating=document.getElementById("ratingInput").value;
+  return [tag,order,rating].filter(Boolean).join(" ");
+}
+
+/* ═══════════════════════════
+   SEARCH / FETCH
+═══════════════════════════ */
+async function startSearch(){ closeAc(); currentPage=1; await fetchRender(); }
+
+async function goPage(p){
+  if(p<1||(p>currentPage&&!hasNext)) return;
+  currentPage=p;
+  await fetchRender();
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+
+async function fetchRender(){
+  const g=document.getElementById("gallery");
+  g.innerHTML=""; showSkel(g);
+  document.getElementById("pagination").style.display="none";
+
+  const perPage=GRID[curGrid].perPage;
+  const tags=buildTags();
+
+  try{
+    const url=`https://danbooru.donmai.us/posts.json?tags=${encodeURIComponent(tags)}&limit=${perPage+1}&page=${currentPage}`;
+    const res=await fetch(url);
+    if(!res.ok) throw new Error("HTTP "+res.status);
+    const data=await res.json();
+    g.innerHTML="";
+
+    hasNext=data.length>perPage;
+    curPosts=hasNext?data.slice(0,perPage):data;
+
+    if(!curPosts.length){
+      g.innerHTML=`<div class="placeholder"><div class="ph-icon">😕</div><h3>Tidak ada hasil</h3><p>Coba tag lain.</p></div>`;
+      return;
+    }
+
+    curPosts.forEach((post,i)=>{
+      if(post.file_url||post.preview_file_url) g.appendChild(makeCard(post,i));
+    });
+
+    // show toolbar
+    ["statusChip","btnSelAll","btnDesel","btnDlSel"].forEach(id=>document.getElementById(id).style.display="");
+    document.getElementById("statusChip").innerHTML=`<b>${curPosts.length}</b> gambar <span>· Hal. ${currentPage}</span>`;
+
+    // pagination
+    const pg=document.getElementById("pagination");
+    pg.style.display="flex";
+    document.getElementById("pgPrev").disabled=currentPage<=1;
+    document.getElementById("pgNext").disabled=!hasNext;
+    document.getElementById("pgInfo").textContent=`Hal. ${currentPage}`;
+
+  }catch(e){
+    g.innerHTML=`<div class="placeholder"><div class="ph-icon">⚠️</div><h3>Error</h3><p>${e.message}</p></div>`;
+  }
+}
+
+function showSkel(g,n=6){
+  for(let i=0;i<n;i++){
+    const s=document.createElement("div");
+    s.className="card skeleton";
+    s.innerHTML=`<div class="sk-thumb"></div><div class="sk-line" style="width:60%"></div><div class="sk-line" style="width:40%"></div>`;
+    g.appendChild(s);
+  }
+}
+
+/* ═══════════════════════════
+   MAKE CARD
+═══════════════════════════ */
+/* ═══════════════════════════
+   CDN URL BUILDER (danbooru style)
+   construct: cdn.donmai.us/original/aa/bb/__char__copy__drawn_by_artist__md5.ext?download=1
+   IDM baca filename dari path URL → nama rapih otomatis
+═══════════════════════════ */
+function buildDlUrl(post){
+  const md5   = post.md5||"";
+  const ext   = post.file_ext||"jpg";
+  const dir   = md5.length>=4?`${md5.slice(0,2)}/${md5.slice(2,4)}`:"00/00";
+  const chars = (post.tag_string_character||"").split(" ").filter(Boolean).slice(0,3).map(t=>t.replace(/_\([^)]+\)$/,"")).join("_");
+  const copy  = (post.tag_string_copyright||"").split(" ").filter(Boolean).slice(0,1).join("_");
+  const arts  = (post.tag_string_artist||"").split(" ").filter(Boolean).slice(0,2);
+  const drawn = arts.length?"drawn_by_"+arts.join("_"):"";
+  const parts = [chars,copy,drawn].filter(Boolean);
+  const fname = parts.length?`__${parts.join("_")}__${md5}.${ext}`:`${md5}.${ext}`;
+  return `https://cdn.donmai.us/original/${dir}/${fname}?download=1`;
+}
+
+function buildFname(post){
+  const chars  =(post.tag_string_character||"").split(" ").filter(Boolean).slice(0,3).map(t=>t.replace(/_\([^)]+\)$/,"")).join("_");
+  const copy   =(post.tag_string_copyright||"").split(" ").filter(Boolean).slice(0,1).join("_");
+  const artists=(post.tag_string_artist||"").split(" ").filter(Boolean).slice(0,2);
+  const drawn  =artists.length?"drawn_by_"+artists.join("_"):"";
+  const md5    =post.md5||String(post.id);
+  const ext    =post.file_ext||"jpg";
+  const parts  =[chars,copy,drawn].filter(Boolean);
+  return(parts.length?`__${parts.join("_")}__`:"")+`${md5}.${ext}`;
+}
+
+function makeCard(post,idx){
+  const card=document.createElement("div");
+  card.className="card";
+
+  const isDone=downloadedSet.has(norm(post.file_url||""));
+  if(isDone) card.classList.add("done");
+
+  const mb=toMB(post.file_size);
+  const sizeStr=fmtBytes(post.file_size);
+  const rating=post.rating||"q";
+  const thumb=post.preview_file_url||post.large_file_url||post.file_url||"";
+  const showSz=document.getElementById("togSize").checked;
+
+  // bottom-left badge: done > size > nothing
+  const blBadge=isDone
+    ?`<span class="badge badge-done">✓ DL</span>`
+    :(sizeStr&&showSz?`<span class="badge badge-size ${scls(mb)}">${sizeStr}</span>`:"");
+
+  card.innerHTML=`
+    <div class="card-thumb">
+      <img src="${thumb}" alt="" loading="lazy">
+      <input type="checkbox" class="card-cb" title="Pilih">
+      <span class="badge badge-top">⭐${fmtN(post.score)} ♡${fmtN(post.fav_count)}</span>
+      <span class="badge-rating ${rcls(rating)}">${rlbl(rating)}</span>
+      ${blBadge}
+      <div class="thumb-dl" title="Unduh">⬇</div>
+    </div>
+    <div class="card-foot" style="${document.getElementById('togHideMeta')?.checked?'display:none':''}">
+      <div class="cf-id">#${post.id}</div>
+      <div class="cf-meta">${(post.file_ext||"jpg").toUpperCase()} · ${post.image_width}×${post.image_height}</div>
+    </div>`;
+
+  card.dataset.idx  =idx;
+  card.dataset.id   =post.id;
+  card.dataset.tags =post.tag_string||"";
+  card.dataset.url  =post.file_url||"";
+  card.dataset.dlurl=buildDlUrl(post);
+  card.dataset.fname=buildFname(post);
+  card.dataset.size =post.file_size||0;
+
+  // Checkbox — don't bubble click
+  card.querySelector(".card-cb").onclick=e=>e.stopPropagation();
+
+  // Download btn — always visible, don't bubble
+  card.querySelector(".thumb-dl").onclick=e=>{ e.stopPropagation(); dlCard(card); };
+
+  // Card click → lightbox
+  card.onclick=()=>openLb(idx);
+  return card;
+}
+
+/* ═══════════════════════════
+   IN-PAGE FILTER
+═══════════════════════════ */
+function parseQ(q){
+  const must=[],excl=[],opt=[];
+  (q||"").split(/\s+/).forEach(t=>{
+    if(!t) return;
+    if(t.startsWith("-")) excl.push(t.slice(1).toLowerCase());
+    else if(t.startsWith("~")) opt.push(t.slice(1).toLowerCase());
+    else must.push(t.toLowerCase());
+  });
+  return{must,excl,opt};
+}
+
+function applyFilter(){
+  const tagQ=document.getElementById("tagFilterInput").value;
+  const minMB=parseFloat(document.getElementById("sizeMin").value)||0;
+  const maxMB=parseFloat(document.getElementById("sizeMax").value)||9999;
+  const hideDone=document.getElementById("togHideDone").checked;
+  const q=parseQ(tagQ);
+  let shown=0,hidden=0;
+
+  document.querySelectorAll("#gallery .card").forEach(card=>{
+    const tags=(card.dataset.tags||"").toLowerCase().split(" ");
+    const mb=toMB(parseInt(card.dataset.size||0));
+    const done=card.classList.contains("done");
+
+    let tagOk=true;
+    if(q.must.length) tagOk=q.must.every(t=>tags.includes(t));
+    if(tagOk&&q.excl.length) tagOk=!q.excl.some(t=>tags.includes(t));
+    if(tagOk&&q.opt.length) tagOk=q.opt.some(t=>tags.includes(t));
+
+    const sizeOk=mb===0||(mb>=minMB&&mb<=maxMB);
+    const show=tagOk&&sizeOk&&!(hideDone&&done);
+    card.style.display=show?"":"none";
+    show?shown++:hidden++;
+  });
+
+  if(tagQ||minMB>0||maxMB<9999) toast(`Filter: ${shown} tampil, ${hidden} disembunyikan`);
+}
+
+function applyMetaVisibility(){
+  const hide=document.getElementById("togHideMeta").checked;
+  document.querySelectorAll("#gallery .card-foot").forEach(el=>{
+    el.style.display=hide?"none":"";
+  });
+}
+
+function toggleAdv(){
+  const p=document.getElementById("advPanel"),t=document.getElementById("advToggle");
+  const o=p.classList.toggle("open");
+  t.classList.toggle("open",o);
+}
+
+/* ═══════════════════════════
+   SELECT & BATCH DL
+═══════════════════════════ */
+function selectAll(){
+  document.querySelectorAll("#gallery .card").forEach(c=>{
+    if(c.style.display!=="none"){const cb=c.querySelector(".card-cb");if(cb)cb.checked=true;}
+  });
+  toast("☑ Semua dipilih");
+}
+function deselectAll(){
+  document.querySelectorAll("#gallery .card .card-cb").forEach(cb=>cb.checked=false);
+  toast("☐ Seleksi dibatalkan");
+}
+async function downloadSelected(){
+  const sel=[...document.querySelectorAll("#gallery .card")].filter(c=>{const cb=c.querySelector(".card-cb");return cb&&cb.checked;});
+  if(!sel.length){ toast("⚠️ Pilih gambar dulu!"); return; }
+  toast(`⬇️ Mengunduh ${sel.length} gambar…`,4000);
+  for(let i=0;i<sel.length;i++){
+    if(!sel[i].dataset.url) continue;
+    await new Promise(r=>setTimeout(r,i===0?0:500));
+    await dlCard(sel[i]);
+  }
+}
+
+/* ═══════════════════════════
+   DOWNLOAD
+═══════════════════════════ */
+function dlCard(card){
+  const dlUrl=card.dataset.dlurl||card.dataset.url;
+  const url  =card.dataset.url;
+  const name =card.dataset.fname;
+  if(!dlUrl){ toast("⚠️ URL tidak tersedia"); return; }
+  if(gmAvail()){
+    window._GM_dl(dlUrl, name,
+      ()=>{ markDone(card,url); toast(`⬇️ ${name}`); },
+      (e)=>{ toast(`❌ GM error: ${(e&&e.error)||"?"}`); }
+    );
+  } else {
+    const a=document.createElement("a");
+    a.href=dlUrl; a.download=name;
+    document.body.appendChild(a); a.click(); a.remove();
+    toast(`⬇️ ${name}`);
+    markDone(card,url);
+  }
+}
+
+function markDone(card,url){
+  downloadedSet.add(norm(url)); saveDL();
+  card.classList.add("done");
+  const th=card.querySelector(".card-thumb");
+  if(!th.querySelector(".badge-done")){
+    th.querySelector(".badge-size")?.remove();
+    const b=document.createElement("span");
+    b.className="badge badge-done"; b.textContent="✓ DL";
+    th.appendChild(b);
+  }
+  updateStat();
+}
+
+/* ═══════════════════════════
+   LIGHTBOX
+═══════════════════════════ */
+function openLb(idx){ lbIdx=idx; showLb(idx); document.getElementById("lb").classList.add("open"); document.body.style.overflow="hidden"; }
+
+function showLb(idx){
+  const post=curPosts[idx]; if(!post) return;
+  lbIdx=idx;
+  const url=post.file_url||post.large_file_url||post.preview_file_url||"";
+  document.getElementById("lbImg").src=url;
+  document.getElementById("lbTitle").textContent=`#${post.id} · ${(post.file_ext||"").toUpperCase()} · ${post.image_width}×${post.image_height}`;
+  document.getElementById("lbMeta").textContent=`⭐${post.score}  ♡${post.fav_count}  ${fmtBytes(post.file_size)||""}  [${rlbl(post.rating)}]`;
+  const tc=document.getElementById("lbTags"); tc.innerHTML="";
+  (post.tag_string||"").split(" ").filter(Boolean).slice(0,50).forEach(t=>{
+    const b=document.createElement("button");
+    b.className="lb-tag"; b.textContent=t;
+    b.onclick=()=>{ tagEl.value=t+" "; closeLb(); startSearch(); };
+    tc.appendChild(b);
+  });
+}
+
+function lbNav(dir){ const n=lbIdx+dir; if(n>=0&&n<curPosts.length) showLb(n); }
+function lbDl(){ const c=document.querySelectorAll("#gallery .card")[lbIdx]; if(c) dlCard(c); }
+function lbOpen(){ const p=curPosts[lbIdx]; if(p) window.open(`https://danbooru.donmai.us/posts/${p.id}`,"_blank"); }
+function closeLb(){ document.getElementById("lb").classList.remove("open"); document.body.style.overflow=""; document.getElementById("lbImg").src=""; }
+function lbBgClick(e){ if(e.target===document.getElementById("lb")) closeLb(); }
+
+document.addEventListener("keydown",e=>{
+  if(!document.getElementById("lb").classList.contains("open")) return;
+  if(e.key==="ArrowLeft") lbNav(-1);
+  if(e.key==="ArrowRight") lbNav(+1);
+  if(e.key==="Escape") closeLb();
+});
+
+/* ═══════════════════════════
+   GM BRIDGE (unsafeWindow._GM_dl)
+═══════════════════════════ */
+const GM_BRIDGE_SRC=`// ==UserScript==
+// @name         Danbooru Fetcher — GM Bridge
+// @namespace    https://kur0yami.github.io/
+// @version      1.0.0
+// @description  Expose GM_download ke Danbooru Fetcher HTML tool
+// @match        file://*danbooru*.html
+// @match        file://*danbooru-1*
+// @match        https://kur0yami.github.io/HTML-TOOL/danbooru-1-4.html
+// @grant        GM_download
+// @grant        unsafeWindow
+// @connect      cdn.donmai.us
+// @connect      danbooru.donmai.us
+// @connect      safebooru.donmai.us
+// @run-at       document-end
+// ==/UserScript==
+(function(){
+"use strict";
+unsafeWindow._GM_dl = function(url, name, onSuccess, onError){
+  GM_download({
+    url:    url,
+    name:   name,
+    saveAs: false,
+    onload:  function(){ if(typeof onSuccess==="function") onSuccess(); },
+    onerror: function(e){ if(typeof onError==="function") onError(e); }
+  });
+};
+console.log("[GM Bridge] _GM_dl injected →", unsafeWindow._GM_dl);
+})();`;
+
+function gmAvail(){ return typeof window._GM_dl==="function"; }
+
+// Poll deteksi bridge aktif setelah load (max 5 detik)
+(function pollBridge(){
+  let t=0;
+  const iv=setInterval(()=>{
+    if(gmAvail()){ clearInterval(iv); updateGMStat(); toast("✅ GM Bridge aktif!",2000); return; }
+    if(++t>=50) clearInterval(iv);
+  },100);
+}());
+
+function updateGMStat(){
+  const el=document.getElementById("gmStat");
+  const btn=document.getElementById("btnInstallBridge");
+  if(!el) return;
+  if(gmAvail()){
+    el.innerHTML=`<span style="color:#4ade80">●</span> GM Bridge: <b>Aktif</b> — silent download ✅`;
+    if(btn) btn.style.display="none";
+  } else {
+    el.innerHTML=`<span style="color:#f87171">●</span> GM Bridge: <b>Belum aktif</b><br><small style="color:#aaa">Install userscript → reload</small>`;
+    if(btn) btn.style.display="";
+  }
+}
+
+function installBridge(){
+  const blob=new Blob([GM_BRIDGE_SRC],{type:"text/javascript"});
+  const url=URL.createObjectURL(blob);
+  window.open(url,"_blank");
+  setTimeout(()=>URL.revokeObjectURL(url),8000);
+  toast("📦 Install di script manager → lalu reload halaman ini",5000);
+}
+
+/* ═══════════════════════════
+   SETTINGS
+═══════════════════════════ */
+function _coreOpenSettings(){
+  document.getElementById("settingsOverlay").classList.add("open");
+  updateStat(); updateGMStat();
+}
+function closeSettings(){
+  document.getElementById("settingsOverlay").classList.remove("open");
+}
+function settingsOverlayClick(e){
+  if(e.target===document.getElementById("settingsOverlay")) closeSettings();
+}
+/* Keep toggleSettings as alias for toolbar button */
+function toggleSettings(){ openSettings(); }
+function updateStat(){ document.getElementById("settingsStat").innerHTML=`DL tercatat: <b>${downloadedSet.size}</b> URL`; }
+
+function exportHistory(){
+  const d={app:"Danbooru Fetcher",exported:new Date().toISOString(),count:downloadedSet.size,urls:[...downloadedSet]};
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(d,null,2)],{type:"application/json"}));
+  a.download=`danbooru_history_${new Date().toISOString().slice(0,10)}.json`;
+  a.click(); URL.revokeObjectURL(a.href);
+  toast(`📤 Export: ${downloadedSet.size} URL`);
+}
+function importHistory(){
+  const inp=document.createElement("input"); inp.type="file"; inp.accept=".json";
+  inp.onchange=e=>{
+    const f=e.target.files[0]; if(!f) return;
+    const r=new FileReader();
+    r.onload=ev=>{
+      try{
+        const p=JSON.parse(ev.target.result);
+        const items=Array.isArray(p)?p:(p.urls||[]);
+        let added=0;
+        items.forEach(u=>{ if(!downloadedSet.has(u)){downloadedSet.add(u);added++;} });
+        saveDL();
+        document.querySelectorAll("#gallery .card").forEach(c=>{ if(downloadedSet.has(norm(c.dataset.url))) markDone(c,c.dataset.url); });
+        toast(`📥 Import: +${added} URL`); updateStat();
+      }catch{ toast("⚠️ File tidak valid"); }
+    };
+    r.readAsText(f);
+  };
+  inp.click();
+}
+function clearHistory(){
+  if(!confirm(`Hapus ${downloadedSet.size} riwayat?`)) return;
+  downloadedSet.clear(); saveDL();
+  document.querySelectorAll("#gallery .card").forEach(c=>{ c.classList.remove("done"); c.querySelector(".badge-done")?.remove(); });
+  updateStat(); toast("🗑️ Riwayat dihapus");
+}
+
+/* ═══════════════════════════
+   CHARS FETCHER
+═══════════════════════════ */
+let charsData  = [];
+let charsFinal = [];
+let charsVariantMap = {};
+
+function openChars(){
+  document.getElementById("charsOverlay").classList.add("open");
+  document.getElementById("charsFranchise").focus();
+}
+function closeChars(){
+  document.getElementById("charsOverlay").classList.remove("open");
+}
+function charsOverlayClick(e){
+  if(e.target===document.getElementById("charsOverlay")) closeChars();
+}
+
+/* Dedup: preserve franchise suffix, strip only middle variant parens
+   amiya_(guard)_(arknights)        → amiya_(arknights)
+   texas_(the_omertosa)_(arknights) → texas_(arknights)
+   amiya_(arknights)                → amiya_(arknights)  (unchanged)
+*/
+function charsBaseKey(name, franchise){
+  if(!name) return "";
+  const suffix="_("+franchise+")";
+  if(name.endsWith(suffix)){
+    const core=name.slice(0, name.length-suffix.length)
+                   .replace(/_?\([^)]+\)/g,"").replace(/_+$/,"");
+    return core+suffix;
+  }
+  return name.replace(/_?\([^)]+\)/g,"").replace(/_+$/,"");
+}
+
+function charsDedup(tags, franchise){
+  const map={}, vmap={};
+  tags.forEach(t=>{
+    if(!t||!t.name) return;
+    const bk=charsBaseKey(t.name, franchise);
+    if(!bk) return;
+    if(!map[bk]){ map[bk]={...t, name:bk}; vmap[bk]=[]; }
+    if(t.name!==bk) vmap[bk].push(t.name);
+    if((t.post_count||0)>(map[bk].post_count||0)) map[bk].post_count=t.post_count;
+  });
+  charsVariantMap=vmap;
+  return Object.values(map).sort((a,b)=>(b.post_count||0)-(a.post_count||0));
+}
+
+/* Female filter: cek implication ke "male", exclude kalau ada.
+   Lebih robust — game baru sering belum punya "female" implication,
+   tapi karakter cowok biasanya sudah punya "male" implication.
+   Tidak ada male implication = include (safe default). */
+async function isMale(charTag){
+  try{
+    const u=`https://danbooru.donmai.us/tag_implications.json?search[antecedent_name]=${encodeURIComponent(charTag)}&search[consequent_name]=male&search[status]=active&limit=1`;
+    const r=await fetch(u);
+    if(!r.ok) return false;
+    const d=await r.json();
+    return Array.isArray(d)&&d.length>0;
+  }catch{ return false; }
+}
+
+async function filterFemale(tags, onProgress){
+  const result=[], BATCH=5;
+  for(let i=0;i<tags.length;i+=BATCH){
+    const batch=tags.slice(i,i+BATCH);
+    const isMaleArr=await Promise.all(batch.map(t=>isMale(t.name)));
+    batch.forEach((t,j)=>{ if(!isMaleArr[j]) result.push(t); }); // exclude if male
+    onProgress(Math.min(i+BATCH,tags.length), tags.length);
+    if(i+BATCH<tags.length) await new Promise(r=>setTimeout(r,150));
+  }
+  return result;
+}
+
+async function fetchChars(){
+  const raw=document.getElementById("charsFranchise").value.trim();
+  if(!raw){ toast("⚠️ Masukkan nama franchise"); return; }
+  const franchise=raw.toLowerCase().replace(/\s+/g,"_");
+  const limit=Math.max(1,Math.min(parseInt(document.getElementById("charsLimit").value)||50,200));
+  const doDedup =document.getElementById("charsDedup").checked;
+  const doFemale=document.getElementById("charsFemale").checked;
+
+  const spin=document.getElementById("charsSpinner");
+  spin.classList.add("show"); spin.textContent="⏳ Fetching karakter…";
+  document.getElementById("charsResult").textContent="";
+  document.getElementById("charsResult").classList.add("empty");
+  document.getElementById("charsStat").textContent="";
+  document.getElementById("charsVariantDetail").style.display="none";
+  ["btnCharsCopy","btnCharsExport","btnCharsSorter"].forEach(id=>document.getElementById(id).style.display="none");
+  charsVariantMap={};
+
+  try{
+    let tags=[];
+    const res1=await fetch(`https://danbooru.donmai.us/tags.json?search[name_matches]=${encodeURIComponent("*_("+franchise+")")}&search[category]=4&search[order]=count&limit=${limit}`);
+    if(res1.ok){ const d=await res1.json(); tags=Array.isArray(d)?d:[]; }
+
+    if(!tags.length){
+      const res2=await fetch(`https://danbooru.donmai.us/related_tag.json?query=${encodeURIComponent(franchise)}&category=4&order=count&limit=${limit}`);
+      if(res2.ok){
+        const r2=await res2.json();
+        let arr=Array.isArray(r2)?r2:(r2.tags||r2.related_tags||[]);
+        tags=arr.map(t=>{ if(t&&t.tag&&t.tag.name) return t.tag; if(t&&t.name) return t; return null; }).filter(Boolean);
+      }
+    }
+
+    tags=tags.filter(t=>t&&typeof t.name==="string"&&t.name.length>0);
+    tags.sort((a,b)=>(b.post_count||0)-(a.post_count||0));
+    charsData=tags.slice(0,limit);
+
+    if(!charsData.length){
+      document.getElementById("charsResult").textContent="Tidak ada karakter ditemukan. Cek nama franchise lewat fitur Cari di bawah.";
+      document.getElementById("charsResult").classList.add("empty");
+      spin.classList.remove("show"); return;
+    }
+
+    let processed=doDedup?charsDedup(charsData,franchise):charsData;
+
+    if(doFemale){
+      spin.textContent=`👧 Filter female (0/${processed.length})…`;
+      processed=await filterFemale(processed,(done,total)=>{
+        spin.textContent=`👧 Filter female (${done}/${total})…`;
+      });
+    }
+
+    charsFinal=processed;
+
+    if(!charsFinal.length){
+      document.getElementById("charsResult").textContent="Tidak ada karakter female setelah filter.";
+      document.getElementById("charsResult").classList.add("empty");
+      spin.classList.remove("show"); return;
+    }
+
+    // Format: strip _(franchise) suffix + ganti _ jadi spasi
+    function fmtName(n){
+      const sfx="_("+franchise+")";
+      if(n.endsWith(sfx)) n=n.slice(0,n.length-sfx.length).replace(/_+$/,"");
+      return n.replace(/_/g," ").trim();
+    }
+    const output=`${franchise}/${charsFinal.map(t=>fmtName(t.name)).join(";")}`;
+    document.getElementById("charsResult").textContent=output;
+    document.getElementById("charsResult").classList.remove("empty");
+    const flags=[doDedup?"dedup":"",doFemale?"female only":""].filter(Boolean);
+    document.getElementById("charsStat").textContent=
+      `${charsFinal.length} karakter${flags.length?" ("+flags.join(", ")+")":""}  ·  raw: ${charsData.length}`;
+    ["btnCharsCopy","btnCharsExport","btnCharsSorter"].forEach(id=>document.getElementById(id).style.display="");
+
+    // Variant detail
+    if(doDedup&&Object.values(charsVariantMap).some(v=>v.length>0)){
+      document.getElementById("charsVariantList").innerHTML=
+        charsFinal.map(t=>{
+          const v=charsVariantMap[t.name]||[];
+          return v.length?`<b>${t.name}</b> ← <span style="color:#1a6bb5">${v.join(", ")}</span>`:"";
+        }).filter(Boolean).join("<br>");
+      document.getElementById("charsVariantDetail").style.display="";
+    }
+
+    if(document.getElementById("charsSetTag").checked)
+      document.getElementById("tagInput").value=franchise;
+
+  }catch(e){
+    document.getElementById("charsResult").textContent="❌ Error: "+e.message;
+    document.getElementById("charsResult").classList.remove("empty");
+    toast("❌ Gagal: "+e.message,3500);
+  }finally{
+    spin.classList.remove("show");
+  }
+}
+
+function charsCopy(){
+  const txt=document.getElementById("charsResult").textContent;
+  if(!txt||txt.startsWith("❌")) return;
+  navigator.clipboard.writeText(txt).then(()=>toast("📋 Tersalin!")).catch(()=>{
+    // fallback
+    const ta=document.createElement("textarea");
+    ta.value=txt; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove();
+    toast("📋 Tersalin!");
+  });
+}
+
+function charsExport(){
+  const txt=document.getElementById("charsResult").textContent;
+  if(!txt||txt.startsWith("❌")) return;
+  const franchise=(document.getElementById("charsFranchise").value.trim().replace(/\s+/g,"_")||"chars").toLowerCase();
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([txt],{type:"text/plain"}));
+  a.download=`${franchise}_chars.txt`;
+  a.click(); URL.revokeObjectURL(a.href);
+  toast("💾 Tersimpan!");
+}
+
+function charsCopySorter(){
+  if(!charsFinal.length) return;
+  const franchise=(document.getElementById("charsFranchise").value.trim().replace(/\s+/g,"_")||"franchise").toLowerCase();
+  const names=charsFinal.map(t=>t.name).join(";");
+  const sorter=`# === ${franchise.toUpperCase()} ===\nFRANCHISE_CHARS["${franchise}"]="${names}"`;
+  navigator.clipboard.writeText(sorter).then(()=>toast("📋 Sorter format tersalin!")).catch(()=>{
+    const ta=document.createElement("textarea");
+    ta.value=sorter; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove();
+    toast("📋 Sorter format tersalin!");
+  });
+}
+
+function charsClear(){
+  charsData=[]; charsFinal=[]; charsVariantMap={};
+  const r=document.getElementById("charsResult");
+  r.textContent="Hasil akan muncul di sini…"; r.classList.add("empty");
+  document.getElementById("charsStat").textContent="";
+  document.getElementById("charsVariantDetail").style.display="none";
+  document.getElementById("charsSearchResult").innerHTML="";
+  ["btnCharsCopy","btnCharsExport","btnCharsSorter"].forEach(id=>document.getElementById(id).style.display="none");
+}
+
+async function searchFranchise(){
+  const kw=document.getElementById("charsSearch").value.trim();
+  if(!kw){ toast("⚠️ Masukkan keyword"); return; }
+  const res2=document.getElementById("charsSearchResult");
+  res2.textContent="🔍 Mencari…";
+  try{
+    const url=`https://danbooru.donmai.us/tags.json?search[name_matches]=${encodeURIComponent("*"+kw+"*")}&search[category]=3&search[order]=count&limit=10`;
+    const r=await fetch(url);
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const data=await r.json();
+    if(!data.length){ res2.textContent="Tidak ditemukan."; return; }
+    res2.innerHTML=data.map(t=>
+      `<span style="cursor:pointer;color:#1a6bb5;font-weight:800;margin-right:6px"
+        onclick="document.getElementById('charsFranchise').value='${t.name}';this.closest('details').removeAttribute('open');fetchChars()"
+      >${t.name}</span><span style="color:#bbb;font-size:.72rem">${(t.post_count||0).toLocaleString()} posts</span><br>`
+    ).join("");
+  }catch(e){
+    res2.textContent="❌ "+e.message;
+  }
+}
+
+/* ═══════════════════════════
+   THEME ENGINE
+═══════════════════════════ */
+const THEME_KEY="db_theme_v1";
+
+function hexToRgb(hex){
+  hex=hex.replace(/^#/,"");
+  if(hex.length===3) hex=hex.split("").map(c=>c+c).join("");
+  const n=parseInt(hex,16);
+  return {r:(n>>16)&255, g:(n>>8)&255, b:n&255};
+}
+function lighten(hex, amt=0.4){
+  const {r,g,b}=hexToRgb(hex);
+  const lr=Math.round(r+(255-r)*amt);
+  const lg=Math.round(g+(255-g)*amt);
+  const lb=Math.round(b+(255-b)*amt);
+  return `rgb(${lr},${lg},${lb})`;
+}
+function darken(hex, amt=0.2){
+  const {r,g,b}=hexToRgb(hex);
+  return `rgb(${Math.round(r*(1-amt))},${Math.round(g*(1-amt))},${Math.round(b*(1-amt))})`;
+}
+function toRgba(hex, a){
+  const {r,g,b}=hexToRgb(hex);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+function applyTheme(c1, c2){
+  const root=document.documentElement;
+  root.style.setProperty("--c1", c1);
+  root.style.setProperty("--c1h", lighten(c1, 0.6));
+  root.style.setProperty("--c1d", darken(c1, 0.15));
+  root.style.setProperty("--c2", c2);
+  root.style.setProperty("--c2h", lighten(c2, 0.6));
+  root.style.setProperty("--c2d", darken(c2, 0.15));
+  root.style.setProperty("--bg", lighten(c1, 0.88));
+  root.style.setProperty("--surface2", lighten(c1, 0.82));
+  root.style.setProperty("--bdr-c", toRgba(c1, 0.3));
+  root.style.setProperty("--sh-c", toRgba(c1, 0.15));
+  // save
+  localStorage.setItem(THEME_KEY, JSON.stringify({c1,c2}));
+}
+function setTheme(c1, c2){
+  document.getElementById("colorC1").value=c1;
+  document.getElementById("colorC2").value=c2;
+  applyTheme(c1, c2);
+}
+function loadTheme(){
+  try{
+    const t=JSON.parse(localStorage.getItem(THEME_KEY)||"{}");
+    if(t.c1&&t.c2) setTheme(t.c1, t.c2);
+  }catch{}
+}
+
+/* ═══════════════════════════
+   INIT
+═══════════════════════════ */
+loadPrefs();
+updateStat();
+updateGMStat();
+setGrid("s");
+startSearch();
+
+/* ═══════════════════════════
+   SYNC STATE
+   Gist + Telegram download tracker sync
+═══════════════════════════ */
+let gistToken    = localStorage.getItem("db_gist_token")   || "";
+let gistId       = localStorage.getItem("db_gist_id")      || "";
+let tgBotToken   = localStorage.getItem("db_tg_token")     || "";
+let tgChatId     = localStorage.getItem("db_tg_chat_id")   || "";
+let tgLastFileId = localStorage.getItem("db_tg_file_id")   || "";
+let autoSyncTg   = localStorage.getItem("db_auto_sync_tg") === "true";
+let _tgSyncTimer = null;
+
+/* ── Prefill inputs saat panel dibuka ── */
+/* Prefill inputs saat settings overlay dibuka */
+function openSettings(){
+  _coreOpenSettings();
+  const gi=document.getElementById("gistTokenInput"); if(gi) gi.value=gistToken;
+  const gd=document.getElementById("gistIdInput");    if(gd) gd.value=gistId;
+  const tt=document.getElementById("tgTokenInput");   if(tt) tt.value=tgBotToken;
+  const tc=document.getElementById("tgChatInput");    if(tc) tc.value=tgChatId;
+  const at=document.getElementById("togAutoTg");      if(at) at.checked=autoSyncTg;
+  updateSyncStat();
+}
+
+function updateSyncStat(){
+  const gs=document.getElementById("gistStat");
+  if(gs) gs.innerHTML=gistId
+    ? `Gist ID: <b>${gistId.slice(0,8)}…</b> &nbsp;·&nbsp; <b>${downloadedSet.size}</b> URLs`
+    : `Belum ada Gist ID`;
+  const ts=document.getElementById("tgStat");
+  if(ts) ts.innerHTML=tgLastFileId
+    ? `file_id: <b>${tgLastFileId.slice(0,18)}…</b>`
+    : `Belum tersync ke Telegram`;
+}
+
+/* ── Hook markDone agar trigger auto-sync ── */
+const _origMarkDone = markDone;
+function markDone(card, url){
+  _origMarkDone(card, url);
+  scheduleTgAutoSync();
+}
+
+function scheduleTgAutoSync(){
+  if(!autoSyncTg || !tgBotToken || !tgChatId) return;
+  clearTimeout(_tgSyncTimer);
+  _tgSyncTimer = setTimeout(() => {
+    tgSync()
+      .then(r => toast(`✈️ Auto-sync TG: ${r.count} URLs`))
+      .catch(e => console.warn("[DanbooruFetcher] TG auto-sync gagal:", e));
+  }, 4500);
+}
+
+/* ═══════════════════════════
+   SHARED PAYLOAD BUILDER
+═══════════════════════════ */
+function buildSyncPayload(){
+  return JSON.stringify({
+    app: "Danbooru Fetcher",
+    exported_at: new Date().toISOString(),
+    count: downloadedSet.size,
+    urls: [...downloadedSet]
+  }, null, 2);
+}
+
+/* ═══════════════════════════
+   GIST SYNC
+   Memakai fetch() biasa — api.github.com support CORS penuh
+═══════════════════════════ */
+async function gistSyncPush(){
+  if(!gistToken) throw new Error("GitHub Token belum diset");
+
+  const payload = buildSyncPayload();
+  const files   = { "danbooru_tracker.json": { content: payload } };
+  const method  = gistId ? "PATCH" : "POST";
+  const url     = gistId
+    ? `https://api.github.com/gists/${gistId}`
+    : "https://api.github.com/gists";
+
+  const res  = await fetch(url, {
+    method,
+    headers: {
+      "Authorization": `token ${gistToken}`,
+      "Content-Type":  "application/json",
+      "Accept":        "application/vnd.github.v3+json"
+    },
+    body: JSON.stringify({ description: "Danbooru Fetcher Tracker", public: false, files })
+  });
+  const data = await res.json();
+  if(!res.ok) throw new Error(data.message || `GitHub API error (${res.status})`);
+
+  if(!gistId && data.id){
+    gistId = data.id;
+    localStorage.setItem("db_gist_id", gistId);
+    const el = document.getElementById("gistIdInput");
+    if(el) el.value = gistId;
+  }
+
+  updateSyncStat();
+  return { count: downloadedSet.size };
+}
+
+async function gistSyncPull(){
+  if(!gistToken) throw new Error("GitHub Token belum diset");
+  if(!gistId)    throw new Error("Gist ID belum diset. Push dulu atau isi Gist ID.");
+
+  const res  = await fetch(`https://api.github.com/gists/${gistId}`, {
+    headers: {
+      "Authorization": `token ${gistToken}`,
+      "Accept":        "application/vnd.github.v3+json"
+    }
+  });
+  const data = await res.json();
+  if(!res.ok) throw new Error(data.message || `GitHub API error (${res.status})`);
+
+  const files = data.files || {};
+  const tf    = Object.values(files).find(f => f.filename.startsWith("danbooru_tracker"));
+  if(!tf) throw new Error("File tracker tidak ditemukan di Gist");
+
+  let content = tf.content;
+  if(tf.truncated){
+    const r2 = await fetch(tf.raw_url, { headers: { "Authorization": `token ${gistToken}` } });
+    content   = await r2.text();
+  }
+
+  const parsed = JSON.parse(content);
+  const urls   = Array.isArray(parsed) ? parsed : (parsed.urls || []);
+  const before = downloadedSet.size;
+  urls.forEach(u => downloadedSet.add(u));
+  saveDL();
+  reMarkDoneCards();
+  updateStat();
+  updateSyncStat();
+  return { added: downloadedSet.size - before, total: downloadedSet.size };
+}
+
+/* ═══════════════════════════
+   TELEGRAM SYNC
+   fetch() ke api.telegram.org — Telegram API mendukung CORS penuh
+   (Access-Control-Allow-Origin: * untuk semua endpoint Bot API)
+═══════════════════════════ */
+async function tgSync(){
+  if(!tgBotToken) throw new Error("TG Bot Token belum diset");
+  if(!tgChatId)   throw new Error("TG Chat ID belum diset");
+
+  const payload  = buildSyncPayload();
+  const filename = `danbooru_tracker_${Date.now()}.json`;
+  const caption  = `\uD83C\uDF38 Danbooru Fetcher Tracker\n\uD83D\uDCE6 ${downloadedSet.size.toLocaleString()} URLs\n\uD83D\uDD50 ${new Date().toLocaleString()}`;
+
+  const form = new FormData();
+  form.append("chat_id",  tgChatId);
+  form.append("caption",  caption);
+  form.append("document", new Blob([payload], { type: "application/json" }), filename);
+
+  const res  = await fetch(`https://api.telegram.org/bot${tgBotToken}/sendDocument`, { method: "POST", body: form });
+  const data = await res.json();
+  if(!data.ok) throw new Error(data.description || `Telegram API error (${res.status})`);
+
+  const fileId = data.result?.document?.file_id || "";
+  if(fileId){
+    tgLastFileId = fileId;
+    localStorage.setItem("db_tg_file_id", fileId);
+  }
+
+  updateSyncStat();
+  return { count: downloadedSet.size, fileId };
+}
+
+async function tgLoad(){
+  if(!tgBotToken) throw new Error("TG Bot Token belum diset");
+  if(!tgChatId)   throw new Error("TG Chat ID belum diset");
+
+  let fileId = tgLastFileId;
+  if(!fileId){
+    fileId = await tgFindLatestFileId();
+    if(!fileId) throw new Error("Tidak ada file_id tersimpan. Sync ulang dulu.");
+  }
+
+  // getFile — dapat file_path dari Telegram
+  let fiRes = await fetch(`https://api.telegram.org/bot${tgBotToken}/getFile?file_id=${encodeURIComponent(fileId)}`);
+  let fi    = await fiRes.json();
+
+  // Kalau file_id expired (>48 jam), fallback ke getUpdates
+  if(!fi.ok){
+    const newId = await tgFindLatestFileId();
+    if(!newId) throw new Error(`getFile gagal: ${fi.description || "expired"}. Sync ulang.`);
+    fileId = newId;
+    fiRes  = await fetch(`https://api.telegram.org/bot${tgBotToken}/getFile?file_id=${encodeURIComponent(fileId)}`);
+    fi     = await fiRes.json();
+    if(!fi.ok) throw new Error(fi.description || "getFile error");
+  }
+
+  const filePath = fi.result?.file_path;
+  if(!filePath) throw new Error("File path tidak ditemukan dari Telegram");
+
+  const dlRes   = await fetch(`https://api.telegram.org/file/bot${tgBotToken}/${filePath}`);
+  const content = await dlRes.text();
+  if(!content) throw new Error("File kosong atau gagal diunduh");
+
+  const parsed = JSON.parse(content);
+  const urls   = Array.isArray(parsed) ? parsed : (parsed.urls || []);
+  const before = downloadedSet.size;
+  urls.forEach(u => downloadedSet.add(u));
+  saveDL();
+
+  tgLastFileId = fileId;
+  localStorage.setItem("db_tg_file_id", fileId);
+
+  reMarkDoneCards();
+  updateStat();
+  updateSyncStat();
+  return { added: downloadedSet.size - before, total: downloadedSet.size };
+}
+
+async function tgFindLatestFileId(){
+  const res  = await fetch(
+    `https://api.telegram.org/bot${tgBotToken}/getUpdates?limit=100` +
+    `&allowed_updates=%5B%22message%22%2C%22channel_post%22%5D`
+  );
+  const data = await res.json();
+  if(!data.ok) return "";
+
+  const chatIdStr = String(tgChatId);
+  for(const update of [...(data.result || [])].reverse()){
+    const msg = update.message || update.channel_post;
+    if(!msg) continue;
+    if(String(msg.chat.id) !== chatIdStr) continue;
+    const doc = msg.document;
+    if(doc && doc.file_name && doc.file_name.startsWith("danbooru_tracker_"))
+      return doc.file_id;
+  }
+  return "";
+}
+
+async function tgTest(){
+  if(!tgBotToken) throw new Error("TG Bot Token belum diset");
+
+  const me = await (await fetch(`https://api.telegram.org/bot${tgBotToken}/getMe`)).json();
+  if(!me.ok) throw new Error(me.description || "Token tidak valid");
+
+  const botName = me.result?.username || "bot";
+  if(tgChatId){
+    const msg = await (await fetch(`https://api.telegram.org/bot${tgBotToken}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: tgChatId, text: "\uD83C\uDF38 Danbooru Fetcher: Koneksi berhasil!" })
+    })).json();
+    if(!msg.ok) throw new Error(`Bot valid (@${botName}), tapi gagal kirim: ${msg.description || "error"}`);
+    return { bot: botName, chatOk: true };
+  }
+  return { bot: botName, chatOk: false };
+}
+
+/* ── Helper: re-mark done cards setelah import ── */
+function reMarkDoneCards(){
+  document.querySelectorAll("#gallery .card").forEach(c => {
+    if(c.dataset.url && downloadedSet.has(norm(c.dataset.url)) && !c.classList.contains("done"))
+      _origMarkDone(c, c.dataset.url);
+  });
+}
+
+/* ═══════════════════════════
+   UI HANDLERS — Gist
+═══════════════════════════ */
+async function uiGistPush(){
+  const btn = document.getElementById("btnGistPush");
+  btn.textContent = "⏳ Pushing…"; btn.disabled = true;
+  try{
+    const r = await gistSyncPush();
+    toast(`☁️ Push OK: ${r.count} URLs ke Gist`);
+    btn.textContent = "✅ Done!";
+  }catch(e){
+    toast(`❌ Gist: ${e.message}`, 6000);
+    btn.textContent = "❌ Gagal";
+  }
+  setTimeout(() => { btn.textContent = "☁️ Push →"; btn.disabled = false; }, 2200);
+}
+
+async function uiGistPull(){
+  const btn = document.getElementById("btnGistPull");
+  btn.textContent = "⏳ Pulling…"; btn.disabled = true;
+  try{
+    const r = await gistSyncPull();
+    toast(`⬇️ Pull OK: +${r.added} URLs (total ${r.total})`);
+    btn.textContent = "✅ Done!";
+  }catch(e){
+    toast(`❌ Gist: ${e.message}`, 6000);
+    btn.textContent = "❌ Gagal";
+  }
+  setTimeout(() => { btn.textContent = "⬇️ Pull ←"; btn.disabled = false; }, 2200);
+}
+
+/* ═══════════════════════════
+   UI HANDLERS — Telegram
+═══════════════════════════ */
+async function uiTgPush(){
+  const btn = document.getElementById("btnTgPush");
+  btn.textContent = "⏳ Mengirim…"; btn.disabled = true;
+  try{
+    const r = await tgSync();
+    toast(`✈️ Terkirim ke TG: ${r.count} URLs`);
+    btn.textContent = "✅ Terkirim!";
+  }catch(e){
+    toast(`❌ TG: ${e.message}`, 7000);
+    btn.textContent = "❌ Gagal";
+  }
+  setTimeout(() => { btn.textContent = "✈️ Sync →"; btn.disabled = false; }, 2200);
+}
+
+async function uiTgPull(){
+  const btn = document.getElementById("btnTgPull");
+  btn.textContent = "⏳ Mengambil…"; btn.disabled = true;
+  try{
+    const r = await tgLoad();
+    toast(`📩 Load TG: +${r.added} URLs (total ${r.total})`);
+    btn.textContent = "✅ Loaded!";
+  }catch(e){
+    toast(`❌ TG Load: ${e.message}`, 9000);
+    btn.textContent = "❌ Gagal";
+  }
+  setTimeout(() => { btn.textContent = "📩 Load ←"; btn.disabled = false; }, 2500);
+}
+
+async function uiTgTest(){
+  const btn = document.getElementById("btnTgTest");
+  btn.textContent = "⏳ Testing…"; btn.disabled = true;
+  try{
+    const r = await tgTest();
+    toast(r.chatOk
+      ? `✅ Bot @${r.bot} aktif, pesan test terkirim!`
+      : `✅ Bot @${r.bot} valid. Set Chat ID untuk test penuh.`
+    , 5000);
+    btn.textContent = "✅ OK!";
+  }catch(e){
+    toast(`❌ ${e.message}`, 7000);
+    btn.textContent = "❌ Gagal";
+  }
+  setTimeout(() => { btn.textContent = "🔍 Test Koneksi"; btn.disabled = false; }, 2500);
+}
+
+</script>
+</body>
+</html>
