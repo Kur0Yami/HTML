@@ -329,6 +329,8 @@ input[type=color].col-inp::-webkit-color-swatch{border:none;border-radius:4px}
 .exp-toggle input:checked + .exp-slider::before{transform:translateX(20px);background:var(--accent2)}
 .exp-lbl{transition:color .15s}
 #dummyToggle:checked ~ * .exp-lbl,.dummy-on .exp-lbl{color:var(--accent2)}
+#unpackPreviewToggle:checked + .exp-slider{background:rgba(52,211,153,.35);border-color:var(--green)}
+#unpackPreviewToggle:checked + .exp-slider::before{transform:translateX(20px);background:var(--green)}
 </style>
 </head>
 <body>
@@ -512,7 +514,19 @@ input[type=color].col-inp::-webkit-color-swatch{border:none;border-radius:4px}
       <div class="ctx-info-sz">Pilih mode export</div>
     </div>
   </div>
-  <div style="display:flex;align-items:center;gap:10px;padding:10px 18px 12px;background:rgba(139,92,246,.07);border-top:1px solid var(--border);border-bottom:1px solid var(--border);margin-bottom:4px">
+  <!-- Custom filename + ext selector -->
+  <div style="padding:10px 14px 10px;background:rgba(99,102,241,.07);border-bottom:1px solid var(--border)">
+    <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">📝 Nama File Output</div>
+    <div style="display:flex;gap:6px;align-items:center">
+      <input id="expNameInput" type="text" placeholder="nama-tema" style="flex:1;min-width:0;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;color:var(--text);outline:none;font-family:inherit" oninput="syncExpPreview()" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
+      <div id="expExtToggle" style="display:flex;background:var(--bg2);border:1px solid var(--border);border-radius:8px;overflow:hidden;flex-shrink:0">
+        <button onclick="setExpExt('mtz')" id="expExtMtz" style="padding:7px 11px;font-size:12px;font-weight:700;border:none;cursor:pointer;transition:all .15s;background:var(--accent);color:#fff">.mtz</button>
+        <button onclick="setExpExt('zip')" id="expExtZip" style="padding:7px 11px;font-size:12px;font-weight:700;border:none;cursor:pointer;transition:all .15s;background:transparent;color:var(--text3)">.zip</button>
+      </div>
+    </div>
+    <div id="expPreviewTxt" style="font-size:10px;color:var(--text3);margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;padding:10px 18px 12px;background:rgba(139,92,246,.07);border-bottom:1px solid var(--border);margin-bottom:4px">
     <span style="font-size:18px">&#x1FA84;</span>
     <div style="flex:1;min-width:0">
       <div style="font-size:13px;font-weight:600;color:var(--text)">Mode Dummy</div>
@@ -525,6 +539,17 @@ input[type=color].col-inp::-webkit-color-swatch{border:none;border-radius:4px}
   </div>
   <div id="expActs">
     <div class="ctx-item" onclick="closeExpMenu();doExport('mtz-full')"><span class="ctx-item-ic">&#x1F4E6;</span><span class="exp-lbl" data-full="Export MTZ (Full)" data-dummy="Export MTZ (Full) &#xB7; Dummy">Export MTZ (Full)</span></div>
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 18px 10px;background:rgba(52,211,153,.07);border-bottom:1px solid var(--border)">
+      <span style="font-size:15px">🖼️</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:600;color:var(--text)">Unpack preview &amp; wallpaper</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:1px">Folder <code style="font-size:10px;color:var(--green)">preview</code> &amp; <code style="font-size:10px;color:var(--green)">wallpaper</code> tetap folder biasa di MTZ (tidak di-pack)</div>
+      </div>
+      <label class="exp-toggle" onclick="event.stopPropagation()">
+        <input type="checkbox" id="unpackPreviewToggle" checked style="opacity:0;width:0;height:0;position:absolute">
+        <span class="exp-slider"></span>
+      </label>
+    </div>
     <div class="ctx-item" onclick="closeExpMenu();doExport('xml-full')"><span class="ctx-item-ic">&#x1F5C2;&#xFE0F;</span><span class="exp-lbl" data-full="Export XML (Full)" data-dummy="Export XML (Full) &#xB7; Dummy">Export XML (Full)</span></div>
     <div class="ctx-sep"></div>
     <div class="ctx-item" onclick="closeExpMenu();doExport('mtz-dark')"><span class="ctx-item-ic">&#x1F319;</span><span class="exp-lbl" data-full="Export MTZ Dark Mode" data-dummy="Export MTZ Dark &#xB7; Dummy">Export MTZ Dark Mode</span></div>
@@ -1533,8 +1558,13 @@ function delSelected(){
   const paths=[...SEL];
   showM('Hapus '+paths.length+' item',`Hapus <strong style="color:var(--red)">${paths.length} item</strong>?`,
     [{text:'Batal',cls:'btn-g'},{text:'🗑 Hapus',cls:'btn-d',fn:()=>{
-      const z=getZ();paths.forEach(p=>{z.remove(p);MOD.delete(p);});
-      SEL.clear();updateSelBar();toast(paths.length+' item dihapus','w');renderBrowser();
+      paths.forEach(p=>{
+        const item=CUR_ITEMS.find(i=>i.path===p);
+        const isDir=item?item.isDir:p.endsWith('/');
+        _doDelete(p,isDir,item||null);
+        MOD.delete(p);
+      });
+      SEL.clear();updateSelBar();toast(paths.length+' item dihapus','w');renderBrowser();scheduleSave();
     }}]);
 }
 async function dlSelected(){for(const p of SEL)await dlFile(p);clearSel();}
@@ -1844,7 +1874,14 @@ async function onReplace(e){
   showSyncReplace(tgt, data);
 }
 async function dlCurrent(){if(ED_PATH)await dlFile(ED_PATH);}
-function delCurrent(){if(ED_PATH)delItemD(ED_PATH,false,closeEditor);}
+function delCurrent(){
+  if(!ED_PATH)return;
+  // Pastikan item ada di CUR_ITEMS agar delItemD bisa resolve _pkg/_inner
+  if(!CUR_ITEMS.find(i=>i.path===ED_PATH)&&window._GSEARCH_ITEM&&window._GSEARCH_ITEM.path===ED_PATH){
+    CUR_ITEMS.push(window._GSEARCH_ITEM);
+  }
+  delItemD(ED_PATH,false,closeEditor);
+}
 
 // ============ FILE OPS ============
 async function dlFile(path){
@@ -1865,10 +1902,38 @@ function delItemD(path,isDir,cb){
   const name=path.replace(/\/$/,'').split('/').pop();
   showM('Hapus '+(isDir?'Folder':'File'),`Hapus <strong style="color:var(--red)">${name}</strong>?`,
     [{text:'Batal',cls:'btn-g'},{text:'🗑 Hapus',cls:'btn-d',fn:()=>{
-      const z=getZ();
-      if(isDir){z.forEach(p=>{if(p.startsWith(path))z.remove(p);});}else z.remove(path);
-      MOD.delete(path);toast('Dihapus: '+name,'w','🗑');renderBrowser();cb&&cb();scheduleSave();
+      _doDelete(path,isDir,CUR_ITEMS.find(i=>i.path===path)||null);
+      MOD.delete(path);
+      toast('Dihapus: '+name,'w','🗑');
+      renderBrowser();cb&&cb();scheduleSave();
     }}]);
+}
+
+function _doDelete(path,isDir,item){
+  if(UNPACK_MODE&&item&&item._pkg&&PKG[item._pkg]){
+    // File/folder di dalam package
+    const sub=PKG[item._pkg];
+    if(isDir){
+      // item._inner untuk folder sudah include trailing slash, misal "res/drawable/"
+      const prefix=item._inner||(path.split('/').slice(1).join('/')+'/');
+      const toRm=[];
+      sub.forEach((fp)=>{if(fp===prefix.replace(/\/$/,'')||fp.startsWith(prefix))toRm.push(fp);});
+      toRm.forEach(fp=>sub.remove(fp));
+    } else {
+      // item._inner = path relatif dalam sub-zip, misal "res/drawable/icon.png"
+      const innerFile=item._inner||path.split('/').slice(1).join('/');
+      sub.remove(innerFile);
+    }
+  } else if(UNPACK_MODE){
+    // Root file/folder di RZ (bukan dalam package)
+    if(isDir){const toRm=[];RZ.forEach((fp)=>{if(fp.startsWith(path))toRm.push(fp);});toRm.forEach(fp=>RZ.remove(fp));}
+    else RZ.remove(path);
+  } else {
+    // Packed/flat mode
+    const z=getZ();
+    if(isDir){const toRm=[];z.forEach((fp)=>{if(fp.startsWith(path))toRm.push(fp);});toRm.forEach(fp=>z.remove(fp));}
+    else z.remove(path);
+  }
 }
 function renameD(item){
   showM('Rename',`Nama baru:<input class="m-input" id="rnI" value="${item.name}">`,
@@ -1909,9 +1974,40 @@ function showAddFolder(){
 
 // ============ EXPORT MENU ============
 function showExportMenu(){
+  // Sync input ke ORIG_MTZ_NAME saat buka
+  const inp=document.getElementById('expNameInput');
+  if(inp&&!inp._userEdited) inp.value=ORIG_MTZ_NAME||'theme';
+  syncExpPreview();
   document.getElementById('expOv').classList.add('show');
   document.getElementById('expSheet').classList.add('show');
 }
+
+// Ext toggle state
+let _expExt='mtz';
+function setExpExt(ext){
+  _expExt=ext;
+  const mtzBtn=document.getElementById('expExtMtz');
+  const zipBtn=document.getElementById('expExtZip');
+  if(mtzBtn&&zipBtn){
+    mtzBtn.style.background=ext==='mtz'?'var(--accent)':'transparent';
+    mtzBtn.style.color=ext==='mtz'?'#fff':'var(--text3)';
+    zipBtn.style.background=ext==='zip'?'var(--accent)':'transparent';
+    zipBtn.style.color=ext==='zip'?'#fff':'var(--text3)';
+  }
+  syncExpPreview();
+}
+function getExpName(){
+  const inp=document.getElementById('expNameInput');
+  return (inp&&inp.value.trim())||ORIG_MTZ_NAME||'theme';
+}
+function syncExpPreview(){
+  const base=getExpName();
+  const ext=_expExt;
+  const dummy=isDummy();
+  const prev=document.getElementById('expPreviewTxt');
+  if(prev) prev.textContent='→ '+base+(dummy?'_modified_dummy':'_modified')+'.'+ext+', '+base+'_dark.'+ext+' ...';
+}
+
 function closeExpMenu(){
   document.getElementById('expOv').classList.remove('show');
   document.getElementById('expSheet').classList.remove('show');
@@ -1927,29 +2023,31 @@ function updateDummyLabels(){
   });
   const row=document.getElementById('dummyToggle')?.closest('div[style]');
   if(row)row.style.background=on?'rgba(139,92,246,.15)':'rgba(139,92,246,.07)';
+  syncExpPreview();
 }
 
 async function doExport(type){
   const dummy=isDummy();
-  const base=ORIG_MTZ_NAME||'theme';
+  const base=getExpName();
+  const ext=_expExt; // 'mtz' or 'zip'
   switch(type){
     case 'mtz-full':
-      if(dummy) await exportDummyMTZ();
-      else await exportMTZ();
+      if(dummy) await buildMTZ(()=>true,base+'_modified_dummy.'+ext,true);
+      else await exportMTZ(base,ext);
       break;
     case 'xml-full':
       await buildXMLZip(()=>true, base+(dummy?'_full_dummy':'_full')+'.zip', dummy);
       break;
     case 'mtz-dark':
-      if(dummy) await buildDummyMTZ(()=>true, base+'_dark_dummy.mtz');
-      else await buildMTZ(()=>true, base+'_dark.mtz');
+      if(dummy) await buildMTZ(()=>true, base+'_dark_dummy.'+ext,true);
+      else await buildMTZ(()=>true, base+'_dark.'+ext);
       break;
     case 'xml-dark':
       await buildXMLZip((_pkg,p)=>isNight(p), base+(dummy?'_dark_dummy':'_dark')+'.zip', dummy);
       break;
     case 'mtz-light':
-      if(dummy) await buildDummyMTZ((_pkg,p)=>!isNight(p), base+'_light_dummy.mtz');
-      else await buildMTZ((_pkg,p)=>!isNight(p), base+'_light.mtz');
+      if(dummy) await buildMTZ((_pkg,p)=>!isNight(p), base+'_light_dummy.'+ext,true);
+      else await buildMTZ((_pkg,p)=>!isNight(p), base+'_light.'+ext);
       break;
     case 'xml-light':
       await buildXMLZip((_pkg,p)=>!isNight(p), base+(dummy?'_light_dummy':'_light')+'.zip', dummy);
@@ -1971,24 +2069,35 @@ async function collectFilesFromZip(z, filterFn){
   return out;
 }
 
+// Helper: status toggle unpack preview/wallpaper
+function isUnpackPreviewWallpaper(){
+  return document.getElementById('unpackPreviewToggle')?.checked!==false;
+}
+// Folder yg dikecualikan dari packing saat export MTZ (ditulis sbg folder biasa)
+const SPECIAL_UNPACK_FOLDERS=new Set(['preview','wallpaper']);
+
 // buildMTZ: repack MTZ, optional dummy (gambar jadi kosong)
+// Jika toggle aktif, folder preview/wallpaper ditulis sebagai folder biasa (bukan sub-zip) di MTZ
 async function buildMTZ(pkgFileFilter, outName, dummy=false){
   if(!RZ)return;
+  const unpackPreview=isUnpackPreviewWallpaper();
   prog(5);toast('Menyiapkan export '+outName+'...','i');
   try{
     const newRZ=new JSZip();
-    const isUnpacked=window._IMPORT_WAS_UNPACKED;
     const pkgFolderNames=new Set(Object.keys(PKG));
 
-    // Root files: hanya yang di root dan bukan package folder
+    // Root files: root langsung + subfolder yang bukan PKG (e.g. preview/wallpaper non-zip)
     const rootFiles=[];
     RZ.forEach((path,entry)=>{
-      if(!entry.dir&&!path.includes('/')){
-        // Pada packed: skip jika path adalah sub-zip package
-        // Pada unpacked: skip jika path adalah nama folder yang sudah jadi PKG
+      if(entry.dir) return;
+      const topFolder=path.split('/')[0];
+      if(!path.includes('/')){
         const baseName=path.replace(/\.(zip|mtz|pkg)$/i,'');
-        if(PKG[path]||pkgFolderNames.has(path)||pkgFolderNames.has(baseName))return;
+        if(PKG[path]||pkgFolderNames.has(path)||pkgFolderNames.has(baseName)) return;
         rootFiles.push({path,entry});
+      } else {
+        if(!pkgFolderNames.has(topFolder)&&!PKG[topFolder]&&!PKG[topFolder+'.zip']&&!PKG[topFolder+'.mtz']&&!PKG[topFolder+'.pkg'])
+          rootFiles.push({path,entry});
       }
     });
     for(const{path,entry}of rootFiles){
@@ -1999,19 +2108,26 @@ async function buildMTZ(pkgFileFilter, outName, dummy=false){
     const pkgNames=Object.keys(PKG);
     for(let i=0;i<pkgNames.length;i++){
       const name=pkgNames[i];
+      const folderName=name.replace(/\.(zip|mtz|pkg)$/i,'');
       const sub=PKG[name];
-      const newSub=new JSZip();
       const items=[];
       sub.forEach((path,entry)=>{if(!entry.dir&&pkgFileFilter(name,path))items.push({path,entry});});
-      for(const{path,entry}of items){
-        const data=dummy&&isImg(path)?new Uint8Array(0):await entry.async('uint8array');
-        newSub.file(path,data);
-      }
-      let cnt=0;newSub.forEach(()=>cnt++);
-      if(cnt>0){
+      if(!items.length){prog(20+Math.round(((i+1)/pkgNames.length)*52));continue;}
+
+      if(unpackPreview&&SPECIAL_UNPACK_FOLDERS.has(folderName)){
+        // Tulis sebagai folder biasa di root MTZ (bukan sub-zip)
+        for(const{path,entry}of items){
+          const data=dummy&&isImg(path)?new Uint8Array(0):await entry.async('uint8array');
+          newRZ.file(folderName+'/'+path,data);
+        }
+      } else {
+        // Pack normal jadi sub-zip
+        const newSub=new JSZip();
+        for(const{path,entry}of items){
+          const data=dummy&&isImg(path)?new Uint8Array(0):await entry.async('uint8array');
+          newSub.file(path,data);
+        }
         const d=await newSub.generateAsync({type:'uint8array',compression:'DEFLATE',compressionOptions:{level:6}});
-        // Untuk unpacked: key adalah folder name (tanpa ekstensi) → tulis tanpa ekstensi ke MTZ
-        // Untuk packed: key sudah include ekstensi asli (misal "com.miui.home.zip")
         newRZ.file(name,d);
       }
       prog(20+Math.round(((i+1)/pkgNames.length)*52));
@@ -2052,7 +2168,7 @@ async function buildXMLZip(pkgFileFilter, outName, dummy=false){
 
 // buildFolderZip: unpack packages jadi ZIP berisi folder-folder package
 // Struktur output: package1/ package2/ (tanpa wrapper folder nama tema)
-// Bisa langsung di-import balik jadi MTZ
+// Semua package ditulis sebagai folder biasa (tidak di-pack)
 async function buildFolderZip(dummy, outName){
   if(!RZ)return;
   prog(5);toast('Menyiapkan ZIP unpacked...','i','📂');
@@ -2075,7 +2191,6 @@ async function buildFolderZip(dummy, outName){
     const pkgNames=Object.keys(PKG);
     for(let i=0;i<pkgNames.length;i++){
       const pkgName=pkgNames[i];
-      // Nama folder = nama package tanpa ekstensi (com.miui.home, bukan com.miui.home.zip)
       const folderName=pkgName.replace(/\.(zip|mtz|pkg)$/i,'');
       const pkgFolder=fz.folder(folderName);
       const sub=PKG[pkgName];
@@ -2102,62 +2217,60 @@ async function buildFolderZip(dummy, outName){
 }
 
 // ============ EXPORT FUNCTIONS ============
-async function exportMTZ(){
+async function exportMTZ(base,ext){
   if(!RZ)return;prog(5);toast('Menyiapkan export...','i');
-  const outName=(ORIG_MTZ_NAME?ORIG_MTZ_NAME+'_modified':'modified_theme')+'.mtz';
+  base=base||(ORIG_MTZ_NAME||'theme');
+  ext=ext||'mtz';
+  const outName=base+'_modified.'+ext;
+  const unpackPreview=isUnpackPreviewWallpaper();
   try{
     const isUnpacked=window._IMPORT_WAS_UNPACKED;
     let i=0,tot=Object.keys(PKG).length;
+    const newRZ=new JSZip();
+    const pkgFolderNames=new Set(Object.keys(PKG));
 
-    if(isUnpacked){
-      // Import dari unpacked folder ZIP → buat MTZ baru dari scratch
-      // PKG[folderName] sudah berisi sub-JSZip dengan file-file di dalamnya
-      // Root files: ambil dari RZ (hanya file di root yang BUKAN folder package)
-      const pkgFolderNames=new Set(Object.keys(PKG));
-      const newRZ=new JSZip();
-
-      // Root files (misalnya description.xml, preview.jpg di root MTZ asli)
-      // Pada unpacked import tidak ada root files karena semua sudah masuk folder,
-      // tapi tetap iterasi jaga-jaga
-      RZ.forEach((path,entry)=>{
-        if(!entry.dir && !path.includes('/') && !pkgFolderNames.has(path)){
-          newRZ.file(path, entry.async('uint8array').then(d=>d));
-        }
-      });
-      // Resolve root files
-      const rootEntries=[];
-      RZ.forEach((path,entry)=>{
-        if(!entry.dir && !path.includes('/') && !pkgFolderNames.has(path))
+    // Root files (bukan package) + folder root yang bukan PKG (e.g. preview/wallpaper yg bukan sub-zip)
+    const rootEntries=[];
+    RZ.forEach((path,entry)=>{
+      if(entry.dir) return;
+      const topFolder=path.split('/')[0];
+      // File di root langsung (tidak ada /)
+      if(!path.includes('/')){
+        if(!pkgFolderNames.has(path)&&!PKG[path]) rootEntries.push({path,entry});
+      } else {
+        // File di sub-folder root — ikut jika folder tsb bukan PKG
+        if(!pkgFolderNames.has(topFolder)&&!PKG[topFolder]&&!PKG[topFolder+'.zip']&&!PKG[topFolder+'.mtz']&&!PKG[topFolder+'.pkg'])
           rootEntries.push({path,entry});
-      });
-      for(const{path,entry}of rootEntries){
-        const data=await entry.async('uint8array');
-        newRZ.file(path,data);
       }
-
-      // Tiap PKG folder → pack jadi sub-ZIP, masuk ke newRZ dengan nama "folderName" (tanpa ekstensi)
-      // atau dengan ekstensi asli jika diketahui (default tanpa ekstensi untuk folder import)
-      for(const[pkgKey,sub]of Object.entries(PKG)){
-        prog(5+Math.round((i/Math.max(tot,1))*45));
-        const d=await sub.generateAsync({type:'uint8array',compression:'DEFLATE',compressionOptions:{level:6}});
-        // pkgKey sudah berupa folder name tanpa ekstensi
-        newRZ.file(pkgKey,d);
-        i++;
-      }
-      prog(55);
-      const blob=await newRZ.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}},m=>prog(55+Math.round(m.percent*.45)));
-      const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=outName;a.click();
-    } else {
-      // Import dari packed MTZ biasa → repack PKG ke dalam RZ
-      for(const[name,sub]of Object.entries(PKG)){
-        prog(5+Math.round((i/Math.max(tot,1))*45));
-        const d=await sub.generateAsync({type:'uint8array',compression:'DEFLATE',compressionOptions:{level:6}});
-        RZ.file(name,d);i++;
-      }
-      prog(55);
-      const blob=await RZ.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}},m=>prog(55+Math.round(m.percent*.45)));
-      const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=outName;a.click();
+    });
+    for(const{path,entry}of rootEntries){
+      const data=await entry.async('uint8array');
+      newRZ.file(path,data);
     }
+
+    // Tiap PKG: pack jadi sub-ZIP, kecuali preview/wallpaper jika toggle aktif
+    for(const[pkgKey,sub]of Object.entries(PKG)){
+      prog(5+Math.round((i/Math.max(tot,1))*45));
+      const folderName=pkgKey.replace(/\.(zip|mtz|pkg)$/i,'');
+
+      if(unpackPreview&&SPECIAL_UNPACK_FOLDERS.has(folderName)){
+        // Tulis sebagai folder biasa di root MTZ
+        const items=[];
+        sub.forEach((path,entry)=>{if(!entry.dir)items.push({path,entry});});
+        for(const{path,entry}of items){
+          const data=await entry.async('uint8array');
+          newRZ.file(folderName+'/'+path,data);
+        }
+      } else {
+        // Pack normal jadi sub-zip
+        const d=await sub.generateAsync({type:'uint8array',compression:'DEFLATE',compressionOptions:{level:6}});
+        newRZ.file(pkgKey,d);
+      }
+      i++;
+    }
+    prog(55);
+    const blob=await newRZ.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}},m=>prog(55+Math.round(m.percent*.45)));
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=outName;a.click();
 
     prog(100);toast('Export MTZ berhasil! → '+outName,'s','💾');setTimeout(()=>prog(0,false),700);
   }catch(e){prog(0,false);toast('Gagal: '+e.message,'e');console.error(e);}
